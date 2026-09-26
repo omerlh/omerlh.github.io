@@ -1,0 +1,8 @@
+#!/bin/sh
+# Blocks commits that contain secrets. Enable once per clone: git config core.hooksPath .githooks
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact -v || { echo "gitleaks found a possible secret. Commit blocked."; exit 1; }
+else
+  echo "warning: gitleaks not installed (brew install gitleaks). Secret scan skipped locally; CI will still scan."
+fi
+python3 build.py >/dev/null && git diff --quiet -- posts index.html || { echo "Generated files changed. Run: python3 build.py && git add -A"; exit 1; }
