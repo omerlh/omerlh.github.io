@@ -1,4 +1,11 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Extending Kubernetes with CRDs - The Hard Way</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2020-04-28. Tools and advice may be out of date.</p><h1>Extending Kubernetes with CRDs - The Hard Way</h1>This is a post I was planning to write a while ago when I worked on <a href="https://kamus.soluto.io">Kamus</a> CRD feature. CRD, or Custom Resource Definition, is a way to extend <a href="https://kubernetes.io/">Kubernetes</a> with a new resource. In my case, I wanted to add a new resource, KamusSecret, which is very similar to a regular <a href="https://kubernetes.io/docs/concepts/configuration/secret/">Secret</a>, just encrypted. Let's see how this can be easily done - using my beloved language, C# :)
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Extending Kubernetes with CRDs - The Hard Way</title><meta name="description" content="Archived post from 2020: Extending Kubernetes with CRDs - The Hard Way">
+<link rel="canonical" href="https://omerlh.github.io/archive/extending-kubernetes-with-crds-the-hard-way/"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23b8431b'/%3E%3Ctext x='32' y='43' font-size='30' font-family='Georgia,serif' font-weight='700' text-anchor='middle' fill='white'%3EOL%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="../../style.css">
+<meta property="og:title" content="Extending Kubernetes with CRDs - The Hard Way"><meta property="og:description" content="Archived post from 2020: Extending Kubernetes with CRDs - The Hard Way"><meta property="og:type" content="website"><meta property="og:url" content="https://omerlh.github.io/archive/extending-kubernetes-with-crds-the-hard-way/">
+<meta name="color-scheme" content="light"></head><body>
+<header class="site"><div class="wrap"><a class="brand" href="../../">Omer <span>Levi</span> Hevroni</a><nav><a href="../../posts/">Writing</a><a href="../../talks/">Talks</a><a href="../../about/">About</a><a href="../../archive/" aria-current=page>Archive</a></nav></div></header>
+<main><div class="wrap"><article><h1>Extending Kubernetes with CRDs - The Hard Way</h1><p class="meta" data-date="2020-04-28">April 28, 2020 · from my old blog</p><div class="archive-banner">This is an archived post from 2020. Tools and advice may be out of date.</div><p class="meta" data-date="2020-04-28">April 28, 2020 · from my old blog</p>This is a post I was planning to write a while ago when I worked on <a href="https://kamus.soluto.io">Kamus</a> CRD feature. CRD, or Custom Resource Definition, is a way to extend <a href="https://kubernetes.io/">Kubernetes</a> with a new resource. In my case, I wanted to add a new resource, KamusSecret, which is very similar to a regular <a href="https://kubernetes.io/docs/concepts/configuration/secret/">Secret</a>, just encrypted. Let's see how this can be easily done - using my beloved language, C# :)
 
 
 
@@ -244,4 +251,6 @@ Extending Kubernetes with CRDs is very simple and requires just a few lines of c
 
 
 
-<p class="note">[Image not available in the archive]</p></body></html>
+<p class="note">[Image not available in the archive]</p></article></div></main>
+<footer><div class="wrap"><span>© 2026 Omer Levi Hevroni</span><span><a href="https://medium.com/@omerlh">Medium</a> · <a href="https://github.com/omerlh">GitHub</a> · <a href="https://www.linkedin.com/in/omerlh">LinkedIn</a> · <a href="https://x.com/omerlh">X</a></span></div></footer>
+</body></html>
