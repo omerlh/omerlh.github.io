@@ -60,7 +60,7 @@ def layout(title, desc, body, path, active='', wide=False):
 <title>{e(title)}</title><meta name="description" content="{e(desc)}">
 <link rel="canonical" href="{url}"><link rel="icon" href="{FAVICON}"><link rel="stylesheet" href="{up}style.css">
 <meta property="og:title" content="{e(title)}"><meta property="og:description" content="{e(desc)}"><meta property="og:type" content="website"><meta property="og:url" content="{url}">
-<meta name="color-scheme" content="light dark"></head><body>
+<meta name="color-scheme" content="light"></head><body>
 <header class="site"><div class="wrap{" wide" if wide else ""}"><a class="brand" href="{root}">Omer <span>Levi</span> Hevroni</a><nav>{nav}</nav></div></header>
 <main>{body}</main>
 <footer><div class="wrap"><span>© {datetime.date.today().year} {NAME}</span><span><a href="https://medium.com/@omerlh">Medium</a> · <a href="https://github.com/omerlh">GitHub</a> · <a href="https://www.linkedin.com/in/omerlh">LinkedIn</a> · <a href="https://x.com/omerlh">X</a></span></div></footer>
