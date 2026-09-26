@@ -142,7 +142,7 @@ home = f'''<div class="wrap wide" style="max-width:720px">
 <div class="links"><a class="btn primary" href="posts/">Read my writing</a><a class="btn" href="about/">About me</a><a class="btn" href="https://medium.com/@omerlh">Medium</a><a class="btn" href="https://github.com/omerlh">GitHub</a></div></div>
 <section><h2 class="label">Latest</h2><div class="cards">{cards.replace('href="../posts/', 'href="posts/')}</div></section>
 <section class="about-teaser"><h2 class="label">A bit about me</h2>
-<p>I've been coding since 4th grade, and spent years in application security and DevSecOps, giving <a href="talks/">talks</a> and contributing to open source. Today I work at <a href="https://ledge.co">Ledge</a>, where AI agents prepare the month-end close.</p>
+<p>I've been coding since 4th grade, and spent years in application security and DevSecOps, giving <a href="talks/">talks</a> and contributing to open source. Since 2022 I've been at <a href="https://ledge.co">Ledge</a>, where AI agents prepare the month-end close.</p>
 <p><a href="about/">More about me →</a> &nbsp; <a href="archive/">Old posts →</a></p></section></div>'''
 write('index.html', layout(f'{NAME}: writing on finance, security and AI agents', 'Personal site of Omer Levi Hevroni. Essays on running life like a company, finance, and application security.', home, ''))
 

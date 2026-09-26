@@ -8,7 +8,7 @@ My passion for application security started by accident, when I was offered the 
 
 Along the way I gave a lot of talks, and wrote a lot about Kubernetes, CI/CD, and security. You can find those in the [archive](../archive/) and on the [talks page](../talks/).
 
-These days I work at [Ledge](https://ledge.co), where AI agents prepare the month-end close for finance teams. Learning what a real close looks like changed how I think about money, and I ended up running my own household the same way. That story is [my latest post](../posts/close-at-home/).
+Since 2022 I've been at [Ledge](https://ledge.co), where AI agents prepare the month-end close for finance teams. Learning what a real close looks like changed how I think about money, and I ended up running my own household the same way. That story is [my latest post](../posts/close-at-home/).
 
 When I'm not working, I'm with my kids, or conquering the world in a strategy game. Budget-approved.
 
