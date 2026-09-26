@@ -1,0 +1,81 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hacking Juice Shop, the DevSecOps Way</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2018-12-23. Tools and advice may be out of date.</p><h1>Hacking Juice Shop, the DevSecOps Way</h1><p style="text-align: left;">Every DevSecOps engineer will recommend you to start using security tests. I personally just blogged about it <a href="../write-good-code-with-security-tests/index.html">recently</a> - if you're not familiar with the concept, I'll highly encourage you to read it first. It's sound right, but there is one important question: Can we find real exploits using security tests? Can we pwn a web application by scanning it for security issues?</p>
+
+<p style="text-align: left;">The best way to find out is to take a real broken web application, scan it with various security tests and look for exploits we can use. Today victim is <a href="https://github.com/bkimminich/juice-shop">OWASP Juice Shop</a>, a very famous vulnerable web application, written using <a href="https://nodejs.org">NodeJS</a> and <a href="https://angular.io/">Angular</a>. Let's try to hack it, the DevSecOps way!</p>
+
+
+
+<h2 style="text-align: left;">Static Analysis</h2>
+
+<p style="text-align: left;">The first method I'll try is static analysis. There are many static analysis tools for NodeJS. I'm a fun of <a href="https://github.com/ajinabraham/NodeJsScan">NodeJSScan</a>, a good static analyzer for JavaScript. It has support for both web UI and REST API, and I can run it simply using docker:</p>
+
+<pre class="wp-block-code"><code>docker run -it -p 9090:9090 opensecurity/nodejsscan:latest</code></pre>
+
+<p style="text-align: left;">Now I can access NodeJsScan by opening http://localhost:9090 in my browser:</p>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: left;">Very intuitive: all I need to do is create a zip file containing Juice Shop source code and upload it. After the scan completes, I can see the report with all the findings:</p>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: left;">Not surprisingly, there are a few issues reported. I want to focus on one specific issue - the <a href="https://www.owasp.org/index.php/SQL_Injection">SQL injection</a>. SQL Injection is an attack that let the attacker run arbitrary SQL code on the database. Let's see what information I can get from NodeJsScan about this issue:</p>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: left;">This is very informative - I can see that the SQL injection is in the login component. By looking on the code, I can see that the user email passed from the request is passed without sanitization to the query. Now that I have all this information, it's time to exploit it:</p>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: left;">Notice the weird email (<code>' or 1=1--</code>)? This is the attack - injecting malicious SQL command, which let me impersonate other users. Using this "email" and any password should let you log in as administrator (which is the first user in the database). Great job NodeJsScan!</p>
+
+<h2 style="text-align: left;">Dynamic Analysis</h2>
+
+<p style="text-align: left;">The second method I'm going to use is dynamic analysis. For dynamic analysis, the best option is to use <a href="https://github.com/zaproxy/zaproxy">OWASP Zap</a>, a free OSS security tool. When Zap is used as a proxy, it can inspect the requests and responses, and look for various security issues. So all I need to do is (a) proxy my browser through Zap and (b) browse through all the pages in Juice Shop. This is a boring and time-consuming task, so I prefer to automate it.</p>
+
+<p style="text-align: left;">Juice Shop has a great tests coverage, including an end to end test. The end to end tests is using selenium to emulate user interactions with all the different features of Juice Shop - which is exactly what I need. All I need to do is proxy these tests with Zap - and I have a dynamic analysis scan. Achieving that required a really small change (see my <a href="https://github.com/bkimminich/juice-shop/pull/761">PR</a> for details), and now all that is required is running (Assuming that Zap is running and that <code>http://localhost:8080</code> is Zap's proxy address.):</p>
+
+<pre class="wp-block-code"><code>http_proxy=http://localhost:8080 yarn run e2e</code></pre>
+
+<p style="text-align: left;">After the end to end test completed, we can take a look at Zap's alerts to look for interesting findings:</p>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: left;">Zap detected an <a href="https://www.owasp.org/index.php/Unvalidated_Redirects_and_Forwards_Cheat_Sheet">Open Redirect</a> issue. This means that the app will accept any URL and will redirect the user to this URL. Really handy when a hacker wants to launch a phishing attack, for example. To exploit this attack, all we need to do is to send the following URL to the targeted user:</p>
+
+<pre class="wp-block-code"><code>http://localhost:3000/redirect?to=https://www.evil.com/?source=https://github.com/bkimminich/juice-shop</code></pre>
+
+<p style="text-align: left;">See how the URL looks like a regular juice shop URL? the user visiting this URL will be redirected to evil.com, thinking they visiting Juice Shop. Nice! Also, notice how I had to add <code>source=https://github.com/bkimminich/juice-shop</code> to my URL? The developers try to mitigate this attack, by checking the target URL but failed to do so properly. Always check your mitigations thoroughly!</p>
+
+<h2 style="text-align: left;">Packages Scanning</h2>
+
+<p style="text-align: left;">The last method will be to scan all the packages used by Juice Shop. As you might already know, each package you're using might contain known security issues (see <a href="https://www.owasp.org/index.php/Top_10-2017_A9-Using_Components_with_Known_Vulnerabilities">A9</a> on OWASP Top 10 for more details). The only way to find out (besides waiting for hackers to exploit these vulnerabilities) is to scan the packages you're using against a database of packages with known vulnerabilities continuously.</p>
+
+<p style="text-align: left;">This might sound complicated, but it's actually very simple. Since NPM 6, NPM has built-in command, <code>npm audit</code>, that scan the all the packages in the current project (follow this <a href="https://docs.npmjs.com/auditing-package-dependencies-for-security-vulnerabilities">guide</a> for more details). NPM audit is a great solution for this issue, but it is not perfect. The tricky part here is maintaining a database of all the packages with known security issues. This is why NPM audit is a great solution, but not enough. For this reason, but not only, I like to use <a href="https://snyk.io/">Snyk</a>, a commercial service for packages scanning ([here](https://snyk.io/blog/whats-a-known-vulnerability) you can read more to find out why Snyk has a better database). To scan Juice Shop packages with Snyk all we need to do is run the following command:</p>
+
+<pre class="wp-block-code"><code>snyk test</code></pre>
+
+<p style="text-align: left;">This will guide Snyk to test all the packages in the current folder. When the scan completes, the tool will list all the issues found by Snyk:</p>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: left;">Well, this is impressive. Juice Shop include 16 packages with known vulnerabilities, pretty impressive. Let's pick one of the issues and inspect it:</p>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: left;">This is an issue in <a href="https://www.npmjs.com/package/sanitize-html">sanitize-html</a> package (full details <a href="https://snyk.io/vuln/npm:sanitize-html:20160801">here</a>). As the name implies, this is a package that should sanitize user input and protect the website from a malicious payload. A good developer used this packages to mitigate <a href="https://www.owasp.org/index.php/Cross-site_Scripting_(XSS)">XSS</a> attacks. This is great, but what happens when the library used to protect from XSS has bugs? Yep, you get an XSS attack. Here is an example malicious payload:</p>
+
+<pre class="wp-block-preformatted">I'm harmless &lt;&lt;script&gt;Foo&lt;/script&gt;iframe src="javascript:alert(`xss`)"&gt;</pre>
+
+<p style="text-align: left;">See the nested iframe tag, inside another script tag? This is the bug. Sanitize-html will sanitize the first script, but not the second one. Let's see it in action:</p>
+
+<div class="wp-block-image" style="text-align: left;">
+<p class="note">[Image not available in the archive]</p>
+</div>
+
+<p style="text-align: left;">What I'm doing here is adding the malicious payload as feedback. All the feedbacks are displayed on the About us page, so once my malicious feedback was sent, <em>any user</em> who will visit the feedback will see this nice alert box jumping. Of course, this is just a demo - I could run any other javascript code.</p>
+
+<h2 style="text-align: left;">Conclusion</h2>
+
+<p style="text-align: left;">I started this post by asking "do security tests can find real exploits". The answer now is a clear yes. Security tests can find real exploits. If the developers of Juice Shop were using one of the tools described here, they had much fewer security issues.</p>
+
+<p style="text-align: left;">What about you? What security issues exist in the app you're working on? Now it's time to scan it with one of the tools mentioned here and find out (this [post](../write-good-code-with-security-tests/index.html) can help you get started).</p></body></html>

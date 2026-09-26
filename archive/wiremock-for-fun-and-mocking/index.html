@@ -1,0 +1,76 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Using Wiremock for Fun and Mocking</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2019-02-06. Tools and advice may be out of date.</p><h1>Using Wiremock for Fun and Mocking</h1><p style="text-align: left;">Mocking - something we all need, and yet, usually, hate. Simply because writing mocks is a boring and cumbersome task. The good news - it doesn't have to be like that. There are so many good alternatives that make mocking easier: From <a href="https://github.com/Soluto/simple-fake-server">libraries</a> that ease the process of writing the mock, though <a href="https://itnext.io/node-js-integration-testing-with-pact-js-1a2ea8aa3116">contract testing</a> with <a href="https://docs.pact.io/">Pact</a> (which solve the problem in a totally different way) to automatically generating mocks using<a href="https://swagger.io/"> Swagger/Open API spec</a>. All are really good solutions - but today I want to focus on WireMock: A tool that really makes mocking a fun.</p>
+
+
+
+<h2 style="text-align: left;">Why WireMock?</h2>
+
+<p style="text-align: left;"><a href="http://wiremock.org/">WireMock</a> is a mocking tool (like the name implied). It can be used <a href="http://wiremock.org/docs/stubbing/">programmatically</a> to create a mock, but the interesting part is the <a href="http://wiremock.org/docs/record-playback/">interactive mode</a>. In the interactive mode, you first use WireMock to record requests to the real API (by proxying the requests and responses). Once the recording completed, WireMock produces mocking from the proxied requests and responses. Using the interactive mode eliminate all the hard work of writing a mock and let you focus on your actual tests. Because the mocks are based on the recording of the actual traffic, the mock is identical to the original API, which makes the tests more reliable. And lastly - updating the mock is as simple as re-recording the requests/responses. Let's take a look at a real example (or just take a look at <a href="https://github.com/Soluto/kamus/tree/master/tests/blackbox">Kamus end-to-end tests</a>).</p>
+
+<h2 style="text-align: left;">Mocking Kubernetes API</h2>
+
+While working on <a href="https://github.com/Soluto/kamus">Kamus</a> (a secret encryption/decryption for <a href="http://kubernetes.io">Kubernetes</a>), I had to mock Kubernetes API. Let's see what how easy it is using WireMock!
+After <a href="http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.18.0/wiremock-standalone-2.18.0.jar">downloading</a> and running WireMock (<code>java -jar java -jar wiremock-standalone-2.18.0.jar</code>), open <code>http://localhost:8080/__admin/recorder/</code> in your browser:
+
+[caption id="attachment_66" align="aligncenter" width="1394"]<span class="note">[Image not available]</span> Clean and simple UI[/caption]
+
+<p style="text-align: left;">Fill the details of the target API (in my case, it is the local Kubernetes proxy URL - <code>http://localhost:8001</code>), and hit "Record". Now, all we need to do is point our code to <code>http://localhost:8080</code> instead of Kubernetes API, and run it. Now it's time to play with our API - make sure to call every functionality so WireMock call record all the different requests and responses (and yes, this should include error cases). This is very similar to how you explorer an application with <a href="https://github.com/zaproxy/zaproxy">Zaproxy</a>, just for different purposes...</p>
+
+<p style="text-align: left;">After the code run completed, hit "Stop" in WireMock UI. Now if you'll look at the folder when you run WireMock, you'll notice a new folder there with the name "mapping". This folder contains all the requests and responses recorded (see an example <a href="https://github.com/Soluto/kamus/tree/master/tests/blackbox/Wiremock/mappings">here</a>).</p>
+
+<h2 style="text-align: left;">Putting it all together</h2>
+
+<p style="text-align: left;">Now that we have the recording ready, all that is left is running the tests. To run the tests, I use <code>docker-compose</code>. This how the <a href="https://github.com/Soluto/kamus/blob/master/tests/blackbox/compose/docker-compose.yaml"><code>docker-compose.yaml</code></a> look like in Kamus:</p>
+
+<pre class="wp-block-code"><code>version: '3'
+services:
+  encryptor:
+    image: $ENCRYPTOR_IMAGE
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+  decryptor:
+    image: $DECRYPTOR_IMAGE
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Kubernetes__ProxyUrl=http://wiremock:8080
+   black-box:
+    build:
+      context: ../
+    environment:
+     - ENCRYPTOR=http://encryptor:9999/
+     - DECRYPTOR=http://decryptor:9999/
+     - TEAMCITY_PROJECT_NAME=api
+     - PROXY_URL=http://zap:8090
+     - KUBERNETES_URL=http://wiremock:8080
+    volumes:
+     - ./reports:/reports
+
+  wiremock:
+    build:
+      context: ../Wiremock
+</code></pre>
+
+<p style="text-align: left;">I defined 4 services - Kamus API (encryptor and decryptor), tests, and WireMock. Notice the <code>KUBERNETES_URL</code>  environment variable - see how it points to Wiremock. Running WireMock in docker is really simple - this is the <a href="https://github.com/Soluto/kamus/blob/master/tests/blackbox/Wiremock/Dockerfile">docker file</a>:</p>
+
+<pre><code>FROM openjdk:8-stretch
+
+WORKDIR /wiremock
+
+RUN wget http://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-standalone/2.17.0/wiremock-standalone-2.17.0.jar
+
+COPY . .
+
+CMD ["java", "-jar", "wiremock-standalone-2.17.0.jar"]
+</code></pre>
+
+<p style="text-align: left;">Notice the copy instruction - this where I copy the mapping folder.
+Now that we have all set - all we need to do in order to run the tests is a simple docker compose command (take a look at <a href="https://github.com/Soluto/kamus/blob/19de80c3ceefbb5973b5cd753d31eec90783cf87/.circleci/config.yml#L27">Kamus CI</a> if you don't believe me):</p>
+
+<p style="text-align: left;"><code>docker-compose up --build --exit-code-from black-box</code>.</p>
+
+<p style="text-align: left;">The tests will run, and the code will use WireMock instead of Kubernetes API.</p>
+
+<span class="note">[Embed removed]</span>
+
+<a href="https://giphy.com/gifs/shia-labeouf-12NUbkX6p4xOO4">via GIPHY</a>
+
+<p style="text-align: left;">Isn't mocking with WireMock fun?</p></body></html>

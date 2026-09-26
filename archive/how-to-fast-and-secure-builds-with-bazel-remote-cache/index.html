@@ -1,0 +1,303 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>How To: Fast and Secure builds with Bazel Remote Cache</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2022-05-16. Tools and advice may be out of date.</p><h1>How To: Fast and Secure builds with Bazel Remote Cache</h1>For the past few months, I've used mainly <a href="https://www.scala-lang.org/" target="_blank" rel="noreferrer noopener nofollow">Scala</a> programing language. Like any other language, I needed a toolchain to compile my code into something I could run. When I started with Scala, I chose to go with <a href="https://www.scala-sbt.org/" target="_blank" rel="noreferrer noopener">SBT</a>. It went pretty well, but I wasn't very happy with it - it is a bit slow, dependency management is not amazing, and some other issues.<br>So I started to look for alternatives, and I was surprised to learn how many alternatives are out there. Of course, I could use any Java tools, like <a href="https://gradle.org/" target="_blank" rel="noreferrer noopener">Gradle</a> or <a href="https://maven.apache.org/what-is-maven.html" target="_blank" rel="noreferrer noopener">Maven</a> - which both support Scala. Like SBT, each has its own downside. While I was looking for other alternatives, I wanted to find something with a good support <a href="https://en.wikipedia.org/wiki/Monorepo" target="_blank" rel="noreferrer noopener">monorepo</a> development strategy (as we are slowly moving our code to monorepo). And at this point, I found <a href="https://bazel.build/" target="_blank" rel="noreferrer noopener">Bazel</a>, a build tool by Google. <br>Bazel is amazing and it can do a lot of things, including building <a href="https://github.com/bazelbuild/rules_scala" target="_blank" rel="noreferrer noopener">Scala source code</a>. One of the coolest Bazel features is the built-in support for <a href="https://bazel.build/docs/remote-caching" target="_blank" rel="noreferrer noopener">remote caching</a>, which aims to speed up build time. For lazy developers like me, the coolest thing here is the native support for <a href="https://cloud.google.com/storage" target="_blank" rel="noreferrer noopener">Google Cloud Storage</a> - so I could have "serverless" cache deployment. This all sounds simple, right? Until you ask: how secure it is? And this is where things become interesting!
+
+
+
+
+
+
+
+
+<h2>What can go wrong?</h2>
+
+
+
+
+Answering this question is very important - without knowing how bad it is, we cannot decide how much we want to spend on securing it. The best way to answer is by doing a <a href="https://www.threatmodelingmanifesto.org/" target="_blank" rel="noreferrer noopener">Threat Modeling</a> analysis, and I like to follow <a href="https://shostack.org/about/adam" target="_blank" rel="noreferrer noopener">Adam Shostack</a>'s "<a href="https://github.com/adamshostack/4QuestionFrame" target="_blank" rel="noreferrer noopener">4 Questions Framework</a>". In the previous section, we answered the first question - what are we building - a cache for Bazel using Google cloud storage. Now let's discuss what could go wrong.<br>To answer it, let's first look at what is stored in the cache. According to the <a href="https://bazel.build/docs/remote-caching" target="_blank" rel="noreferrer noopener">documentation</a>:<br><em>The remote cache stores two types of data:</em>
+
+
+
+
+<ul><li><em>The action cache, which is a map of action hashes to action result metadata.</em></li><li><em>A content-addressable store (CAS) of output files.</em></li></ul>
+
+
+
+
+So assuming a hacker got access to the cache, she could download all the output of the cached output. In the case of Scala code - this is the compiled <a href="https://en.wikipedia.org/wiki/Java_bytecode" target="_blank" rel="noreferrer noopener">Java Bytecode</a> which could be <a href="https://www.baeldung.com/java-decompiling-classes" target="_blank" rel="noreferrer noopener">decompiled</a> easily to the actual Java source code. So the main issue here is information disclosure - but it is not the only one.<br>What if a hacker can <strong>write</strong> to the cache? Assuming this done right, this will trick Bazel to download the compiled result and run it on your machine (or your CI machine) - leading to remote code execution. It is out of the scope of this blog to analyze how hard it is (and if you do end up writing something like this, please do let me know!).
+
+
+
+
+<h3>Data Flow Analysis  </h3>
+
+
+
+
+So, to conclude, we want to protect the cache. Really hard. But what do we need to protect?
+
+
+
+
+<div class="wp-block-image"><p class="note">[Image not available in the archive]</p></div>
+
+
+
+
+We have 2 main flows here:
+
+
+
+
+<ul><li>A Developer, running Bazel on her local machine (read-only)</li><li>The CI machine (we are using <a href="https://circleci.com/" target="_blank" rel="noreferrer noopener">CircleCI</a>), building our code (read/write)</li></ul>
+
+
+
+
+The source of truth for our cache is the CI, so this is why developers need only read permissions from the cache. Only the CI will update the cache, and only for code that was pushed to source control.<br>Now, with a clear picture in the head of the data flow and what can go wrong, let's see how we can prevent it!
+
+
+
+
+<h2>What are we doing about it?</h2>
+
+
+
+
+The first thing to do is ensure the storage follows Google's <a href="https://cloud.google.com/storage/docs/gsutil/addlhelp/SecurityandPrivacyConsiderations#access-control-lists" target="_blank" rel="noreferrer noopener">security documentation</a>. Especially, I prefer using <a href="https://cloud.google.com/storage/docs/uniform-bucket-level-access" target="_blank" rel="noreferrer noopener">Unified Bucket Level Access</a> so that all objects will always have the same permissions - to ensure no object is accessible without authentication by mistake. I also prefer to enable <a href="https://cloud.google.com/storage/docs/public-access-prevention" target="_blank" rel="noreferrer noopener">Public Access Prevention</a> on the bucket. By enabling both settings, we now just need to worry about creating the right <a href="https://cloud.google.com/iam" target="_blank" rel="noreferrer noopener">IAM</a> roles (see the list of all available roles <a href="https://cloud.google.com/iam/docs/understanding-roles#:~:text=A%20role%20contains%20a%20set,grant%20roles%20to%20the%20members." target="_blank" rel="noreferrer noopener">here</a>):
+
+
+
+
+<ul><li>Developers need only the Storage Object Viewer role. This will give them read-only access to the bucket.</li><li>For our CI we can use the Storage Object Admin, which gives the CI full access to the bucket content (but no permissions to change bucket settings, like Public Access Prevention).</li></ul>
+
+
+
+
+Careful! Those roles should be <a href="https://cloud.google.com/storage/docs/access-control/using-iam-permissions" target="_blank" rel="noreferrer noopener">assigned to the specific bucket</a> we created for the cache, not to all the buckets in the account!
+
+
+
+
+<h3>Authenticating developers</h3>
+
+
+
+
+Authenticating developers is really simple - Bazel supports authentication to Google Cloud Storage with <a href="https://google.aip.dev/auth/4110" target="_blank" rel="noreferrer noopener">Google Application Default Credentials</a>. So, if you have <code>gcloud</code> installed and authenticated all you need to do is pass <code>--google_default_credentials</code> to Bazel and it will use your credentials to authenticate to GCS.<br>Now, all we need is to assign the Role we mentioned above to all the developers (for example, with a <a href="https://cloud.google.com/iam/docs/overview#google_group" target="_blank" rel="noreferrer noopener">group</a>), and now all our developers can securely access the cache.
+
+
+
+
+<h3>Authenticating CircleCI</h3>
+
+
+
+
+This part is a bit more tricky. Traditionally it would involve creating a <a href="https://cloud.google.com/iam/docs/service-accounts" target="_blank" rel="noreferrer noopener">service account</a> with static credentials and using it from the CI. This has some downsides, for example:
+
+
+
+
+<ul><li>If our CI is compromised, a hacker could steal those static credentials and use them to access our bucket.</li><li>We need to frequently rotate those credentials, which is cumbersome.</li><li>We need to ensure we pass them securely to the CI server and that we clean up any temporary location we used to store them in transit (think about the machine used by the developer creating them).</li></ul>
+
+
+
+
+Luckily, we have a better option today: <a href="https://circleci.com/blog/openid-connect-identity-tokens/" target="_blank" rel="noreferrer noopener">Identity Token</a>. An identity token is a unique identifier of the specific job running on CircleCI that we can easily verify (usually, a <a href="https://jwt.io/" target="_blank" rel="noreferrer noopener">JWT</a>). By establishing trust between our cloud provider and CircleCI, we can use this token to authenticate to the cloud <strong>without any static credentials</strong>! <br>
+
+
+
+
+<div class="wp-block-image"><p class="note">[Image not available in the archive]</p></div>
+
+
+
+
+
+<h3>Setting up Identity Token</h3>
+
+
+
+
+To establish trust between Google Cloud and Circle CI, we need to set up <a href="https://cloud.google.com/iam/docs/workload-identity-federation" target="_blank" rel="noreferrer noopener">Workload Identity Federation</a>. This can be done by running a few commands using <code>gcloud</code> cli (or with <a href="https://www.terraform.io/" target="_blank" rel="noreferrer noopener">Terraform</a>):
+
+
+
+
+<pre class="wp-block-code"><code>gcloud iam workload-identity-pools create circle-ci \    
+  --location="global" \
+  --description="Used by CircleCI" \    
+  --display-name="CircleCI Pool" \
+  --project &lt;project id>
+
+gcloud iam workload-identity-pools providers create-oidc circle-ci \
+  --location="global" \    
+  --workload-identity-pool="circle-ci" \    
+  --issuer-uri="https://oidc.circleci.com/org/&lt;CircleCI Org Id>" \    
+  --allowed-audiences="&lt;CircleCI Org Id>" \    
+  --attribute-mapping="google.subject=assertion&#91;"oidc.circleci.com/project-id"]" \    
+  --project &lt;project id>
+</code></pre>
+
+
+
+
+Those commands create the necessary resources for establishing trust between Circle CI and Google Cloud. See the docs above for more details! <br>To use them we need to find the Organization Id, which can be found at:
+
+
+
+
+<pre class="wp-block-code"><code>https:&#47;&#47;app.circleci.com/settings/organization/github/&lt;name&gt;/overview</code></pre>
+
+
+
+
+Replace the name with your organization's name on Github.<br>Now we need to give permission for a specific project on Circle CI to Google Cloud. This can be done from the console (if you found how to do this with the CLI, let me know!(
+
+
+
+
+<ul><li>First, go to the provider settings - it will be under (replace <code>&lt;&gt;</code> with the relevant project id):</li></ul>
+
+
+
+
+
+<pre class="wp-block-code"><code>https:&#47;&#47;console.cloud.google.com/iam-admin/workload-identity-pools/pool/circle-ci?project=&lt;&gt;</code></pre>
+
+
+
+
+
+<ul><li>Now click on "Grant Access"</li></ul>
+
+
+
+
+
+<div class="wp-block-image"><p class="note">[Image not available in the archive]</p></div>
+
+
+
+
+
+<ul><li>And now choose the permissions required:</li></ul>
+
+
+
+
+
+<div class="wp-block-image"><p class="note">[Image not available in the archive]</p></div>
+
+
+
+
+Here we can bind a service account to identity in this pool. Create a service account, and assign it the permissions we discussed above (Storage Object Admin) only on the specific bucket. Choose it in the Service account Combobox. <br>We also want to control which projects on CircleCI can assume this service account - we can control this by specifying a subject on the second Combobox. The value should be the project id of the project we want to grant permission on CircleCI. This is working because of the attribute mapping we set when we created the pool:
+
+
+
+
+<pre class="wp-block-code"><code>--attribute-mapping="google.subject=assertion&#91;"oidc.circleci.com/project-id"]"</code></pre>
+
+
+
+
+You can find the project id on the project settings page on CircleCI.
+
+
+
+
+<h3>Using Identity Federation in a Job</h3>
+
+
+
+
+Ok, now we established trust between a specific project on CircleCI to a specific service account on Google Cloud. How we can use it? Very simple:
+
+
+
+
+<pre class="wp-block-code"><code>- run: 
+          name: Login to GCP
+          command: |
+            echo $CIRCLE_OIDC_TOKEN &gt; $HOME/circle_token
+            gcloud iam workload-identity-pools create-cred-config \
+              &lt;pool URL&gt;\
+              --service-account=&lt;service account email&gt; \
+              --output-file=$HOME/creds.json \
+              --credential-source-file=$HOME/circle_token \
+              --credential-source-type=text 
+            gcloud auth login --cred-file=$HOME/creds.json</code></pre>
+
+
+
+
+What we are doing here?
+
+
+
+
+<ul><li>Writing CircleCI's identity token to a file so we could use it later to authenticate to Google Cloud</li><li>Invoke a specific command to generate a credentials file using the identity pool we created before, the email of the service account we want to assume, and the location of the token file.<br>You can find the service account email on the service account page on the console. To find the pool URL, use <code>gcloud</code>:</li></ul>
+
+
+
+
+
+<pre class="wp-block-code"><code>gcloud iam workload-identity-pools providers list \ 
+  --location=global \
+  --workload-identity-pool="circle-ci" \
+  --project=&lt;project name&gt;</code></pre>
+
+
+
+
+The <code>name</code> returned by this command is the URL. <br>All we need is to tell Bazel to use the credentials file to authenticate to Google Cloud:
+
+
+
+
+<pre class="wp-block-code"><code>--google_credentials=/home/circleci/creds.json</code></pre>
+
+
+
+
+And Bazel builds on our CI could authenticate to Google Cloud and use the cache for faster builds!
+
+
+
+
+<h2>Did we do a good job?</h2>
+
+
+
+
+This is the last question in the model, and usually the most challenging one. Let's reflect on what we did today. First, let's look at the risks we identified:
+
+
+
+
+<ul><li>Potential information disclosure if unauthorized person gains read access to the bucket.</li><li>Potential remote code execution if unauthorized person gains write access to the bucket.</li></ul>
+
+
+
+
+We mitigated those risks by:
+
+
+
+
+<ul><li>Preventing anonymous access to the bucket (and following Google's documentation).</li><li>Following <a href="https://www.cisa.gov/uscert/bsi/articles/knowledge/principles/least-privilege#:~:text=The%20Principle%20of%20Least%20Privilege%20states%20that%20a%20subject%20should,control%20the%20assignment%20of%20rights." target="_blank" rel="noreferrer noopener">Least Privilege Principle</a> and grant only the permissions required and only to this bucket.</li><li>Leveraging CircleCI's identity token to authenticate to GCP without static credentials.</li></ul>
+
+
+
+
+Seems like we did a pretty good job here. But it's important to remember we can always do more. For example, what about supply chain risks? Compromising the CI in order to poison the cache with malicious files to gain remote code execution? <br>There are always additional risks and mitigation we could implement, and this is why this question is so important. To remind us to keep assessing what we did.
+
+
+
+
+<h2>Wrapping Up</h2>
+
+
+
+
+Using Bazel remote cache, our builds are much faster now - down from ~12 minutes to ~4 minutes. I used <code><a href="https://bazel.build/docs/bazelrc" target="_blank" rel="noreferrer noopener">.bazelrc</a></code> to configure common Bazel settings with one setting for the CI and one for running locally. This was inspired by <a href="https://github.com/tensorflow/tensorboard/tree/master" target="_blank" rel="noreferrer noopener">Tensorboard</a> setup, take a look at the repository to learn how they did it.<br>We are now slowly moving to a very interesting future, where every machine has an identity - including our CI servers. We can use this identity to provide secure access to anything we need - and slowly move toward a truly passwordless future. There are endless opportunities for what we can do with it. Exciting times!</body></html>

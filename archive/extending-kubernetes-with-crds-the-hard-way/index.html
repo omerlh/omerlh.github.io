@@ -1,0 +1,247 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Extending Kubernetes with CRDs - The Hard Way</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2020-04-28. Tools and advice may be out of date.</p><h1>Extending Kubernetes with CRDs - The Hard Way</h1>This is a post I was planning to write a while ago when I worked on <a href="https://kamus.soluto.io">Kamus</a> CRD feature. CRD, or Custom Resource Definition, is a way to extend <a href="https://kubernetes.io/">Kubernetes</a> with a new resource. In my case, I wanted to add a new resource, KamusSecret, which is very similar to a regular <a href="https://kubernetes.io/docs/concepts/configuration/secret/">Secret</a>, just encrypted. Let's see how this can be easily done - using my beloved language, C# :)
+
+
+
+
+
+
+
+
+<h2>Getting Started</h2>
+
+
+
+
+The first step, of course, is reading the <a href="https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/">documentation</a>:
+
+
+
+
+<div style="height:20px" aria-hidden="true" class="wp-block-spacer"></div>
+
+
+
+
+
+<blockquote class="wp-block-quote">The&nbsp;<a href="https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/">CustomResourceDefinition</a>&nbsp;API resource allows you to define custom resources. Defining a CRD object creates a new custom resource with a name and schema that you specify. The Kubernetes API serves and handles the storage of your custom resource. The name of a CRD object must be a valid&nbsp;<a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/names#dns-subdomain-names">DNS subdomain name</a>.</p></blockquote>
+
+
+
+
+
+Confused? So I was when I first read this. I mean, I get what a CRD is - but what I need to do in order to implement one? Apparently, there are  only two things you need to do:
+
+
+
+
+<ul><li>Define the new resource using a CRD object</li><li>Write a code that reacts to <a href="https://en.wikipedia.org/wiki/Create,_read,_update_and_delete">CRUD</a> (create, read, update and delete) events of this resource </li></ul>
+
+
+
+
+Did you notice that there is not step for actually handling CRUD operations? Kubernetes does all this for you. Just by defining the resource, you can use it like any other Kubernetes resource - create, edit, delete - and everything will work without any additional code. This is really awesome. It also means that if you (like <a href="https://twitter.com/QuinnyPig">Corey Quinn</a>) like to abuse things, you can use Kubernetes like a NoSQL database: Just create a CRD for the object you'd like to store, and that's it. You can now store it on Kubernetes just like any other database. Anyway, please don't try that in production :)
+
+
+
+
+<h2>Creating the CRD </h2>
+
+
+
+
+A <a href="https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/">CRD</a> is just another Kubernetes resource, which you can create using a manifest. This, for example, is the CRD for KamusSecret:
+
+
+
+
+<pre class="EnlighterJSRAW" data-enlighter-language="yaml" data-enlighter-theme="" data-enlighter-highlight="" data-enlighter-linenumbers="" data-enlighter-lineoffset="" data-enlighter-title="" data-enlighter-group="">apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: kamussecrets.soluto.com
+spec:
+  group: soluto.com  
+  versions:
+  - name: v1alpha2
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          data:
+            type: object
+            additionalProperties: true
+          stringData:
+            type: object
+            additionalProperties: true
+          serviceAccount: 
+            type: string
+          type:
+            type: string
+  scope: Namespaced
+  names:
+    plural: kamussecrets
+    singular: kamussecret
+    kind: KamusSecret
+    shortNames:
+     - ks</pre>
+
+
+
+
+What we have here?
+
+
+
+
+<ul><li>Lines 8-24 defines the our resources object schema, using <a href="https://www.openapis.org/">OpenAPI</a> schema. It's an object that has three properties, <code>data</code>, <code>stringData</code> and <code>type</code> (exactly like the properties regular secrets has). It also has additional property called <code>serviceAccount</code>, that is used for decryption.</li><li>Like any resource it has API group (<code>soluto.com</code>, see line 5) and version (<code>v1alpha2</code>, see line 8.</li><li>It also has a name and kind (see lines 26-31) and a scope (Namespaced, see line 25).</li></ul>
+
+
+
+
+After creating this resource, our new KamusSecret resource is ready to use! We can now use regular kubectl commands - like <code>kubectl get ks --all-namespaces</code> or <code>kubectl apply -f kamus-secret.yaml</code>, and it will work - just like any other resource. This is very nice if we want to use Kubernetes as a database, but usually, we need to do something when our resource is created/edited/deleted. For example, when a KamusSecret is created, I want to decrypt all the items and create a new Secret with the decrypted values. How can I do it? This is why we need a controller!
+
+
+
+
+<h2>Writing our first controller</h2>
+
+
+
+
+As I said earlier, Kubernetes handles all the hard parts for us - persistency, handling user requests, and everything we need for CRUD operations. Kubernetes also supports <a href="https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes">watching</a> resources: You can watch any resource, and Kubernetes will send events about the resource (ADDED/MODIFIED/DELETED). 
+
+
+
+This is how we can implement the logic for our CRD - by writing a code that watch changes to all the CRDs on the cluster, and responds to the various events.  This is all the code we need (using <a href="https://github.com/kubernetes-client/csharp">Kubernetes C# SDK</a>):
+
+
+
+
+<pre class="EnlighterJSRAW" data-enlighter-language="csharp" data-enlighter-theme="" data-enlighter-highlight="" data-enlighter-linenumbers="" data-enlighter-lineoffset="" data-enlighter-title="" data-enlighter-group="">var path = $"apis/{group}/{version}/watch/{plural}";
+var watcher = await kubernetes.WatchObjectAsync&lt;TCRD>(path,
+                   onEvent: (@type, @event) => subject.OnNext((@type, @event)),
+                    onError: e => subject.OnError(e),
+                    onClosed: () => subject.OnCompleted());</pre>
+
+
+
+
+The <code>WatchObjectAsync</code> receive three callback: <code>onEvent</code> get called with the relevant event, <code>onError</code> when there is an error, and <code>onClosed</code> when the connection is closed. 
+
+
+
+Now, all we need to do is implement a simple state machine and react to each one of the events:
+
+
+
+
+<pre class="EnlighterJSRAW" data-enlighter-language="csharp" data-enlighter-theme="" data-enlighter-highlight="" data-enlighter-linenumbers="" data-enlighter-lineoffset="" data-enlighter-title="" data-enlighter-group="">switch (@event)
+  {
+      case WatchEventType.Added:
+          await HandleAdd(kamusSecret);
+          return;
+
+      case WatchEventType.Deleted:
+           //Ignore delete event - it's handled by k8s GC;
+           return;
+
+       case WatchEventType.Modified:
+            await HandleModify(kamusSecret);
+            return;
+        default:
+              mLogger.Warning(
+                   "Event of type {type} is not supported. KamusSecret {name} in namespace {namespace}",
+                 @event.ToString(),
+                 kamusSecret.Metadata.Name,
+                 kamusSecret.Metadata.NamespaceProperty ?? "default");
+                return;
+
+}</pre>
+
+
+
+
+Simple, right? You can find the entire code of the controller <a href="https://github.com/Soluto/kamus/blob/master/src/crd-controller/HostedServices/V1Alpha2Controller.cs">here</a>. 
+
+
+
+You might noticed that I'm ignoring the <code>Deleted</code> event. This is because we can let Kubernetes handle this for us - by marking object as "owned" by other object. For example, this is the code that create a Secret from a KamusSecret:
+
+
+
+
+<pre class="EnlighterJSRAW" data-enlighter-language="csharp" data-enlighter-theme="" data-enlighter-highlight="" data-enlighter-linenumbers="" data-enlighter-lineoffset="" data-enlighter-title="" data-enlighter-group="">var ownerReference = !this.mSetOwnerReference ? new V1OwnerReference[0] : new[]
+{
+     new V1OwnerReference
+     {
+          ApiVersion = kamusSecret.ApiVersion,
+          Kind = kamusSecret.Kind,
+          Name = kamusSecret.Metadata.Name,
+          Uid = kamusSecret.Metadata.Uid,
+           Controller = true,
+           BlockOwnerDeletion = true,
+       }
+};
+
+return new V1Secret
+{
+    Metadata = new V1ObjectMeta
+    {
+          Name = kamusSecret.Metadata.Name,
+          NamespaceProperty = @namespace,
+         OwnerReferences = ownerReference
+     },
+      Type = kamusSecret.Type,
+       StringData = decryptedStringData,
+       Data = decryptedData 
+ };</pre>
+
+
+
+
+The <a href="https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/#owners-and-dependents">Owner Reference</a> tell Kubernetes that this resource is owned by a different resource. When the owner resource (the KamusSecret) is deleted, Kubernetes Garbage Collection will also clean the owned resource - in my case, the Secret. Nice, right?
+
+
+
+
+<h2>Are we done?</h2>
+
+
+
+
+On one hand, yes. By writing just a few lines of codes, I can now create a KamusSecret object, and a decrypted secret will be created. On the other hand, this is just the tip of the iceberg. For example, testing is not easy at all (see the tests I wrote <a href="https://github.com/Soluto/kamus/tree/master/tests/crd-controller">here</a>). There are also very complex issues that I didn't handle, like high availability (using<a href="https://en.wikipedia.org/wiki/Leader_election"> leader election algorithm</a>), using the <a href="https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions">resource version</a> for filtering events that already handled, and <a href="https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definition-versioning/">versioning</a> (and I can share from experience, this is not easy at all to implement). Each one of them is another thing we need to implement and test. 
+
+
+
+
+<div style="height:20px" aria-hidden="true" class="wp-block-spacer"></div>
+
+
+
+
+Luckily, and this is why this post is called "The Hard Way", as there are easy ways to write controllers. One way is using the <a href="https://github.com/operator-framework/operator-sdk">Operator SDK</a>, which generates and handles most of the heavy things for you, so you can focus only on the logic. Using the operator SDK it took me less than an hour to write a <a href="https://github.com/omerlh/zap-operator">Zap Operator</a>, with far less code and much more robust controller. On the other hand, if you can't write the operator in <a href="https://golang.org/">Go language</a> (like in the case of Kamus, where most of the code base is in C#), you cannot use this SDK.
+
+
+
+
+<div style="height:20px" aria-hidden="true" class="wp-block-spacer"></div>
+
+
+
+
+Another option is to use <a href="https://github.com/kubernetes-sigs/kubebuilder">kubebuilder</a>, the framework that also used by the Operator SDK. Kubebuilder is more low level, but gives your more flexibility - but still, requires you to write your code in Go. 
+
+
+
+
+<h2>Wrapping Up</h2>
+
+
+
+
+Extending Kubernetes with CRDs is very simple and requires just a few lines of code, especially if you use Operator SDK or kubebuilder. As we saw, Kubernetes handles all the hard parts for you and lets you focus on the logic. I hope now you have a better understanding of the relationship between a controller and a CRD, and you're ready to start writing you're own CRDs! Did you end up writing something? Do share! I'll be happy to hear about it!
+
+
+
+<p class="note">[Image not available in the archive]</p></body></html>

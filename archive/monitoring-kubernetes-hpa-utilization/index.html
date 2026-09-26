@@ -1,0 +1,47 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Monitoring Kubernetes HPA Utilization</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2019-04-09. Tools and advice may be out of date.</p><h1>Monitoring Kubernetes HPA Utilization</h1><p style="text-align: left;">In the past few weeks, I was working on migrating a legacy micro-service to <a href="http://kubernetes.io">Kubernetes</a> platform. The migration process was relatively simple - mainly migrating the code from .NET 4.5 framework to .NET core 2.2. After making sure the service is deployed and working is expected, I started to gradually move production traffic to the new instance. The new service handle the traffic well, and I was happy - look like this task is about to complete!</p>
+
+<p style="text-align: left;">After a few days of a gradual rollout, I felt good enough to move all the traffic to the new service. And then it hit me: will the new service be able to handle the load of production traffic? I mean, I configured a <a href="https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/">Horizontal Pod Autoscaler</a> (HPA) for this service - but does it enough? Apparently - no. But before I'll explain why, let's do a quick recap on HPA.</p>
+
+
+
+<h2 style="text-align: left;">Kubernetes Horizontal Pod Autoscaler (HPA)</h2>
+
+<p style="text-align: left;">The HPA is responsible to scale up (or down) our service by adding (or removing) pods, based on specific metrics. For example, this is the HPA for my new service, set to scale based on CPU usage:</p>
+
+<pre class="wp-block-code"><code>apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  labels:
+    app: my-new-service
+  name: my-new-service-hpa
+spec:
+  maxReplicas: 10
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1beta1
+    kind: Deployment
+    name: my-new-service
+  targetCPUUtilizationPercentage: 50</code></pre>
+
+<p style="text-align: left;">Let's go over it quickly:</p>
+
+<ul style="text-align: left;">
+    <li><code>maxReplicas</code> and <code>minReplicas</code> defines the maximum and the minimum number of pods for my new service. The number of pods will be between 2 and 10.</li>
+    <li><code>targetCPUUtilizationPercentage</code> define the CPU utilization thresholds - the HPA will change the number of pods if the average CPU of all pods will go above (or below) 50%. The actual algorithm is a bit more complex.</li>
+    <li><code>scaleTargetRef</code> defines the HPA target - in this case, the deployment of my new service.</li>
+</ul>
+
+<p style="text-align: left;">As I said, I configured the HPA - so, theoretically, my service should be able to scale and handle the load of production traffic. This is correct - with one small problem: What will happen if my service needs more than 10 pods? The HPA will not scale it up - because this will breach the <code>maxReplicas</code> setting. This could cause a serious production issue - so it's better to ensure we have good monitoring in place!</p>
+
+<h2 style="text-align: left;">Measuring HPA Utilization</h2>
+
+<p style="text-align: left;">In order to monitor the HPA, I want to measure it's "utilization" - the number of running pods divided by the maximum number of pods defined. For example, 2 out of 10 is low utilization - but 9 out of 10 is high and should trigger an alert.</p>
+
+<p style="text-align: left;">Calculating the utilization is simple using <a href="https://github.com/kubernetes/kube-state-metrics">Kube-state-metrics</a>. Kube-state-metrics is an agent that expose various metrics about all the objects in the cluster, including <a href="https://github.com/kubernetes/kube-state-metrics/blob/master/docs/horizontalpodautoscaler-metrics.md">HPA</a>. Calculating the utilization of the HPA is simple using the following Prometheus query:</p>
+
+<pre class="wp-block-code"><code>kube_hpa_status_current_replicas{hpa='my-new-service'}/
+kube_hpa_spec_max_replicas{hpa='my-new-service'}*100</code></pre>
+
+<h2 style="text-align: left;">Wrapping Up</h2>
+
+<p style="text-align: left;">Now I can create a simple alert, that will be triggered when the HPA efficiency is over 80% - giving me enough time to investigate and take an action. With this alert configured, I can safely move all the production traffic to the new service - and feel safe about it! What about you? Do you already monitor the utilization of your HPA?</p></body></html>

@@ -1,0 +1,47 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Do we really need threat modeling?</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2019-10-30. Tools and advice may be out of date.</p><h1>Do we really need threat modeling?</h1><p style="text-align: left;">I'm a huge fun of threat modeling. It's a very powerful tool, that can find a lot of security issues. If you're not familiar with it, check out my <a href="../threat-modeling-as-code/index.html">earlier post</a> on the subject. For the past few years, I was struggling with one simple question: when should we conduct threat modeling? After all, threat modeling has a price - it takes time to conduct it, and usually involve a few peoples. We can't conduct a full threat model for every feature - we need to find a way to identify the "interesting" features that require a threat model.</p>
+
+
+
+
+
+<p style="text-align: left;">One very interesting solution to this hard problem was proposed by Izar Tarandach in this <a href="https://www.youtube.com/watch?v=VbW-X0j35gw">talk</a>. In short, he proposes to tag features as "threat model worthy", and once in a while go over all the features with this tag and review them. This is a really interesting approach, and I highly recommend you to watch the entire talk. However, from my experience, it's not a silver bullet for this problem, and I want to propose an alternative approach.</p>
+
+<p style="text-align: left;"></p>
+
+
+
+
+
+<p style="text-align: left;">We almost always build the same thing. Usually, some kind of REST API that do CRUD operations over a database. So, even if the feature we're working on is very sensitive (collect credit card information, for example) the software we're actually building could be the same as the other 200 services we already have. If it's exactly the same, do we still need to conduct a threat model? Maybe there is a better way.</p>
+
+
+
+
+
+<h2 style="text-align: left;">Scaling Threat Model</h2>
+
+
+
+
+
+<p style="text-align: left;">Let's take the common pattern we have, conduct a threat model for it, and document it (maybe using <a href="../threat-modeling-as-code/index.html">source control</a>). Then, we can create templates, libraries, and boilerplates for the developers to use - based on the threat and mitigations we discussed.</p>
+
+
+
+
+
+<p style="text-align: left;">Instead of saying "a database should not be accessible from the internet", we can create a template with <a href="https://www.pulumi.com/">Pulumi</a> or <a href="https://www.terraform.io/">Terraform</a> for databases. Each time a developer needs a database, she can use it to create a database - and she'll get the most secure database we can. We can even write unit tests for our infrastructure. Let's unleash the power of <a href="https://en.wikipedia.org/wiki/Infrastructure_as_code">infrastructure as code</a> and use it to scale threat modeling.</p>
+
+
+
+
+
+<p style="text-align: left;">Instead of implementing authentication and authorization logic in each service we write, we can write generic policies using tools like <a href="https://www.openpolicyagent.org/">Open Policy Agent</a>. All the services can use the same policies without the need to re-implement them each time. Authentication can be solved using proxies like <a href="https://www.envoyproxy.io/">Envoy</a> or <a href="https://github.com/Soluto/airbag">Airbag</a>. No need to review the same implementation over and over again.</p>
+
+
+
+
+
+<p style="text-align: left;">Now, instead of asking "do we need to conduct a threat model" we need to ask "what are we building". Do you use common templates and libraries? You're probably safe. Do you use new technology? A new kind of database? A new protocol? Adding a new authorization policy? Let's talk. It's probably better to conduct threat modeling and update our templates. Scaling threat model was never easier. </p>
+
+What do you think? Is that something that can work for you? Or maybe there is something I missed? I'm looking forward to hearing you're thoughts about it!</body></html>

@@ -1,0 +1,83 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Leveraging Web Security to Harden WordPress Security</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2018-11-22. Tools and advice may be out of date.</p><h1>Leveraging Web Security to Harden WordPress Security</h1>As you might already notice, my new blog is powered by <a href="http://wordpress.com">WordPress</a>. When I chose to start a new blog and run it WordPress, I started to look on WordPress security. There are already great posts about improving the security of your WordPress site (see for example <a href="https://www.wpbeginner.com/wordpress-security/">this</a> and <a href="https://codex.wordpress.org/Hardening_WordPress">this</a> guides). There are also many posts describing various security plugins you should be installing.
+
+All this information is critical - but it's not enough. What about elementary web security practices? For example, leveraging security headers to protect your site? Or enabling <code>security.txt</code> so good hackers will know how to contact you, in case they find a vulnerability in your site?
+
+
+
+I wanted to enable these settings on my site, and in this post, I'll share with you how. In some cases, it was simple. In others, it was almost impossible. This is why I'm sharing this process - so you can learn from my experience, and use it to secure your own site. Read along to find out how you can increase the security of your WordPress installation - by applying elementary (but important) web application security practices.
+
+<h2>Security Headers</h2>
+
+Security headers are special HTTP headers that the server add to the response headers and can mitigate various attacks. You can find the full list of headers <a href="https://www.owasp.org/index.php/OWASP_Secure_Headers_Project#tab=Headers">here</a>, on the Owasp Secure Headers Project page. The easiest way to start with security headers is by scanning a website with <a href="https://securityheaders.com/">Security Headers</a>, a project by Scott Helme. This tool will inspect the response headers of a site, and give it a grade. So the first thing I did was the scan my blog with it, here is the result (the site is my blog, served on a temporary DNS. And yes, I'm working on this post since Augost):
+
+[caption id="attachment_76" align="aligncenter" width="2454"]<span class="note">[Image not available]</span> Well, that's embarrassing, source: securityheader.io[/caption]
+
+Ok, so all the security headers are missing. Let's try to get an A score!
+
+<h3>Adding CSP</h3>
+
+The first header I'll add is CSP - or <a href="https://scotthelme.co.uk/protect-site-from-cryptojacking-csp-sri/">Content Security Policy</a> (or CSP). CSP is a really important security header - it allows to define what your site allowed (or not) to do. For example - from which sites it can load scripts, or if inline scripts are allowed. This is why CSP can block attacks like XSS, but it's also why CSP can break the functionality of a site. Enabling CSP is done simply by using the plugin <a href="https://wordpress.org/plugins/wp-content-security-policy/">WordPress Content Security Plugin</a>. This plugin also adds a few other security headers. After installing the plugin, we need to configure the policy, on the setting page:
+
+[caption id="attachment_83" align="aligncenter" width="1950"]<span class="note">[Image not available]</span> Setting up CSP policy with the plugin[/caption]
+
+Building a policy is the hard part of applying CSP. The easiest way to build it is to block everything - and fix what breaks. After a few attempts, I was able to find all the resources that my site was using and allow them in the policy. YAY!
+
+It all works well, besides one small issue - inline javaScript. CSP can help to mitigate XSS (<a href="https://www.owasp.org/index.php/Cross-site_Scripting_(XSS)">Cross-Site Scripting</a>) by blocking inline JavaScript code. If inline JavaScript is disabled, XSS attack becomes a lot harder. Unfortunately, many WordPress plugins use inline JavaScript for their normal functionality, including JetPack (see this <a href="https://github.com/Automattic/jetpack/issues/10707">issue</a>). If you, like me, using such a plugin, you'll have to choose between security (disabling the plugin and blocking inline JavaScript) or usability (enabling the plugin and allowing inline JavaScript). This is not a simple choice. Personally, I chose usability here, but I'm not happy with my choice.
+
+[caption id="attachment_87" align="alignnone" width="2452"]<span class="note">[Image not available]</span> source: securityheader.io[/caption]
+
+The CSP plugin also adds other security headers like <code>X-Frame-Options</code> and <code>X-XSS-Protection</code>. After I set up the CSP policy, I also enabled all these headers, and I'm now ready to re-test my blog:
+
+I got A score! Horray! A is nice, but not enough. Let's try to add these 2 missing headers - and achieve A+!
+
+<h3>Strict-Transport-Security</h3>
+
+Strict Transport Security (or HSTS from now) is a very important security header. You can read the full explanation <a href="https://scotthelme.co.uk/hsts-the-missing-link-in-tls/">here</a>. In short - this header instructs the browser to load the site on HTTPS always, even if the user requested the HTTP version. The combination of HSTS and TLS make sure the connection is secure and a malicious third-party cannot intercept it.
+
+Enabling HSTS can be done either via the CSP plugin, or, if using <a href="https://www.cloudflare.com/">CloudFlare</a> for HTTPS, via CloudFlare - see <a href="https://blog.cloudflare.com/enforce-web-policy-with-hypertext-strict-transport-security-hsts/">here</a> how. One last note about HSTS - for highly sensitive sites should be added to the browser <a href="https://hstspreload.org/">pre-loaded list</a>. All sites in the lists are loaded into the browser code and are always served over HTTPS, including the first time the user loads the site.
+
+<h3>Feature Policy</h3>
+
+It's time for the last security header - Feature Policy. Feature Policy allows to enable or disable browser features. For example, my blog does not need access to the user webcam or microphone. If my blog asks for it, most chances it's malicious. By using feature policy, I can block these features and protect the users of my sites. And as always, Scott Helme has a <a href="https://scotthelme.co.uk/tag/feature-policy/">great post</a> about this header and why it is so important.
+
+Currently, there is no WordPress plugin that adds this header (if you write something, please let me know!). One way to achieve that is by using <a href="https://scotthelme.co.uk/security-headers-cloudflare-worker/">CloudFlare Worker</a> - but this option cost additional money. I added it to my blog by adding the following line to <code>.htaccess</code>:
+
+<pre><code><br />Header set Feature-Policy: "geolocation 'none'; notifications 'none'; push 'none'; microphone 'none'; camera 'none'; speaker 'none'; payment 'none'"
+
+</code></pre>
+
+<h3>Final Scan</h3>
+
+Now, after setting all the headers, it's time for the final re-test:
+
+[caption id="attachment_89" align="aligncenter" width="2462"]<span class="note">[Image not available]</span> Final Scan, source: securityheader.io[/caption]
+
+Unfortunately, I wasn't able to get an A+ grade. I have all the headers - but because of the weak CSP policy (alow unsafe inline JavaScript), the site score was downgraded. Hopefully, in the future, I will be able to fix my CSP policy and get A+ score on my site. In case you're courious, you can find the full report here
+
+<h2>Security.txt</h2>
+
+Until now, I discussed various response headers we can use to make it harder for a bad hacker to hack my site. Blocking the bad hacker is important, but even more important is helping the good hackers. Good hackers, similar to bad hackers, might find security issues on my site. It's my interest to let them know how they should report these issues to me, so I can fix them.
+
+The simple way to achieve that is by using <a href="https://securitytxt.org/">security.txt</a> - a file, in a well-known location (<code>.well-known/security.txt</code>), with all the relevant information (e.g. email, PGP key etc). Adding a <code>security.txt</code> to is a lot simple than adding security headers and completely harmless. I wanted to add it to my blog (just because I'm a security geek), so I tried to use the <a href="https://wordpress.org/plugins/wp-security-txt/">WordPress plugin</a>. Unfortunately, it did not work (see this <a href="https://github.com/austinheap/wordpress-security-txt/issues/7">issue</a>), I hope to have time soon to deep dive into that.
+
+<h2>Plugins Scan</h2>
+
+All WordPress users do massive usages of plugins. Just until now I installed 3 security plugins. Plugins are useful, but can also introduce security issues. After all, plugins are just coded that someone else writes and is running on my site. If this code has a security issue, these issues affect my site. This is why scanning the plugin I'm using for known security issues is important - so I can know and fix it before the bad hackers will.
+
+The most simple way to do this is by using <a href="https://wpvulndb.com/">WordPress vulnerability DB</a> - as the name implies, this site contains all the known vulnerabilities in WordPress versions, plugins, and themes. So I can check this site manually before installing a plugin or a theme - or just use another plugin that does this work for me. Enter <a href="https://wordpress.org/plugins/plugin-security-scanner/">Plugin Security Scanner</a> - a plugin that does exactly that. The plugin will run a scan on a daily basis and will send a report if it finds a vulnerable plugin. Here is an example report I received this week:
+
+[caption id="attachment_164" align="aligncenter" width="1806"]<span class="note">[Image not available]</span> A vulnerability alert[/caption]
+
+Neat! I just go to my blog, update the plugin - and I'm done. Now I can rest assured, knowing that I'm using WordPress plugins safely.
+
+<h2>Conclusion</h2>
+
+Here my journey ended. My blog is a lot more secure now than what it was before. To recap, this is the plugins I added to my blog:
+
+<ul>
+    <li><a href="https://wordpress.org/plugins/wp-content-security-policy/">WordPress Content Security Plugin</a>. This plugin adds CSP (and other security headers) to your site. These are headers that make the bad hacker job a bit harder. Don't forget to use <a href="http://securityheaders.io/">securityheaders.io</a> to test your site!</li>
+    <li><a href="https://wordpress.org/plugins/wp-security-txt/">security.txt</a>. Security.txt is a new standard for sharing with the good hacker how they should report security issues. This plugin did not work for me, hope it will be fixed soon.</li>
+    <li><a href="https://wordpress.org/plugins/plugin-security-scanner/">Plugin Security Scanner</a>. This plugin scans the installed WordPress version, plugins, and themes for known security issues, on a daily basis.</li>
+</ul>
+
+Now that I have all these security plugins enabled, I can focus more on writing content, and less about the security of my blog.</body></html>

@@ -1,0 +1,136 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AppSec Learning SRE principles: Metrics and Measurements</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2020-05-17. Tools and advice may be out of date.</p><h1>AppSec Learning SRE principles: Metrics and Measurements</h1>The field of <a href="https://en.wikipedia.org/wiki/Site_Reliability_Engineering">SRE</a> (site reliability engineering) - is relatively matured, and there is a lot written about it. Especially, Google released a really <a href="https://landing.google.com/sre/sre-book/toc/">good book</a> discussing how SRE works at Google. What can we, AppSec engineers (ASE?), can learn from SRE principles to improve our field? Today I want to focus on one aspect: metrics and measurements - something that is my personal focus right now. What metrics SRE define and measure and can we define something similar?
+
+
+
+
+
+
+
+
+<h2>It's all about SL*</h2>
+
+
+
+
+<a href="https://landing.google.com/sre/sre-book/chapters/service-level-objectives/">Chapter 4</a> of Google's SRE book focus on defining service level as a measurement tool. I know, this is not a SRE post, but bare with me for a few moments, so we could all speak the same language. What are those service levels?
+
+
+
+
+<ul><li>SLI - service level indicator: "A carefully defined quantitative measure of some aspect of the level of service that is provided". SLI is just a fancy name for a metric that lets us measure how well a service is functioning. For example, the percentage of failed requests, out of all requests.</li><li>SLO - service level objective: "A target value or range of values for a service level that is measured by an SLI". Given an SLI, the SLO defines what should be the value (or range of values) for these metrics. For example - given the previous SLI (percentage of failed requests), one can define an SLO of 5%.</li><li>SLA - service level agreement: "An explicit or implicit contract with your users that includes consequences of meeting (or missing) the SLOs they contain". SLA is how we communicate outside our SLOs. Giving the previous example, our SLO should be 5%, but we can decide our SLA is a bit less strict - for example 10%. This gives us some flexibility because usually breaching an SLA usually has a business impact (for example, our SLA might be part of the contract we signed with our users).</li></ul>
+
+
+
+
+Ok, so this is interesting - but we are AppSec engineers - not SREs - why should we care about all those SL*? 
+
+
+
+
+<h2>Measuring our AppSec program</h2>
+
+
+
+
+
+<blockquote class="wp-block-quote"> <em>You can’t manage what you can’t measure</em></p><cite>Peter Drucker</cite></blockquote>
+
+
+
+
+
+Defining metrics is critical to a successful AppSec program (And you can see that bot <a href="https://owaspsamm.org/model/governance/strategy-and-metrics/">SAMM</a> and <a href="https://www.bsimm.com/framework/governance/software-security-metrics-strategy.html">BSIMM</a> specify it). Measuring our AppSec program serves 2 purposes:
+
+
+
+
+<ul><li>Allows us to declare what is important to us, and clearly communicate it</li><li>Allows us to track our progress, especially to measure if our money/time is well spent</li></ul>
+
+
+
+
+Which gets us to one of the most challenging questions - what should we measure? And here, there is no clear framework, like we have for SRE. But can we reuse this framework? What if we try to measure a service risk like we measure service level? We could have the following:
+
+
+
+
+<ul><li>SRI - service risk indicator: a carefully defined quantitative measure of some aspect of the risk of service that is provided (almost the same definition). This should be a single metric that allows us to measure the risk of a given service (or maybe a team/company/feature?). Here the examples could be - number of monthly security incidents, number of monthly reports from a bug bounty, <a href="https://owasp.org/www-community/Source_Code_Analysis_Tools">SAST</a>/<a href="https://www.techopedia.com/definition/30958/dynamic-application-security-testing-dast">DAST</a> input, PRs with security code review, or maybe even percentage of features that conduct a <a href="https://owasp.org/www-community/Threat_Modeling">threat model</a>.</li><li>SRL - service risk level: A target value or range of values for a service risk that is measured by an SRI. This is where things become interesting: What if we a team define their own SRIs? One team might need a stricter SRO, and choose the number monthly of reports as their SRI. This team could choose 1 as their SRO, and act accordingly. </li><li>SRA - An explicit or implicit contract with your users that includes consequences of meeting (or missing) the SROs they contain. By defining SRAs, we can communicate better to our users, for example, the security of our product. Imagine having a status page, like the one you already have, just for SRAs - it gives a lot of visibility to your users about what you care about and how secure the product they're using is.</li></ul>
+
+
+
+
+But defining metrics is only the first step. How should we act upon this metrics? And this is where another SRE tool come in handy - error budgets.
+
+
+
+
+<h2>Error Budget</h2>
+
+
+
+
+<a href="https://landing.google.com/sre/sre-book/chapters/embracing-risk">Chapter 3</a> of Google's SRE book discusses the idea of "Error Budget": "The error budget provides a clear, objective metric that determines how unreliable the service is allowed to be within a single quarter". Error budget allows us to have an informative discussion about technical issues. For example, should we spend time in the next sprint in re-writing a service? Without data, it's basically a fight between the product manager and the developers.
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+
+<p class="has-text-align-center">A discussion without Error Budget <a href="https://giphy.com/gifs/mrw-pull-infront-e37RbTLYjfc1q">via GIPHY</a></p>
+
+
+
+
+So how this relate to the previous SL* discussion before? The error budget is highly tightened to our SLO. Each time the SLO is breached, some of the error budget is burned - depend on how much time it was breached. Ee can now look at when planning features. Do we think re-writing service is critical? Let's define, together, how many of the error budget are we accepting to burn each month/week before stopping and investigating time on technical issues? 5%? 10%? 
+
+
+
+
+<div style="height:20px" aria-hidden="true" class="wp-block-spacer"></div>
+
+
+
+
+The error budget lets us set the balance we agree upon between features and technology. There is no right answer here - each team has the answer right for them. But once we agreed on a number - for example, 5%, we can use this when planning and discussing what we should do next. More important, we can easily communicate outside and inside our team.
+
+
+
+
+<h2>Defining the risk budget</h2>
+
+
+
+
+So how this relevant to our AppSec program? I'm sure we all familiar with the regular discussion with the product managers (and with developers) about security controls. It always a hard discussion, and usually not very informed. Now that we have our SR* framework, we can define our risk budget. It will work the same: each time our SRO is breached, the error budget is burned. Now, we just need to agree on how much risk budget we are willing to burn each month/week - let's say 5%. Planning is easy now - let's look at how many budget we already burned and used this to decide how much to invest in AppSec.
+
+
+
+
+<div style="height:22px" aria-hidden="true" class="wp-block-spacer"></div>
+
+
+
+
+The risk budget also helps us to monitor how good our SRIs/SROs - if it is burning too slow or too fast - we should probably redefine it (which is also true for SRE and this is why it also used for monitoring - read more about it <a href="https://landing.google.com/sre/workbook/chapters/alerting-on-slos/">here</a>). If we feel that we're not spending enough on security - let's look at our SR*. Or maybe we should redefine our risk budget? Or, even better, it is just a feeling and we actually in a pretty good state?
+
+
+
+
+<h2>Putting it all together</h2>
+
+
+
+
+We started with the need to define metrics for our AppSec program. Rethinking SRE frameworks like SL* or error budget and redefining them for AppSec provides us a lot of value. Defining our SRI/O/A helps us communicate what we care about - and measure it. The risk budget allows us to have an informed discussion on how much we need to invest in security - it a tool to clearly define the balance between features and security. 
+
+
+
+
+<div style="height:20px" aria-hidden="true" class="wp-block-spacer"></div>
+
+
+
+
+What I shared here are just some thoughts I'm having in recent times - not something I have a lot of experience with. I'm sharing it here to start a discussion - and I'm looking forward to hearing feedback about it: Is it interesting? Something you think worth trying? What other SRE practices can we take into AppSec (hint: chaos engineering!). Please share your ideas with me - let's discuss on OWASP slack (join us on <a href="https://owasp.slack.com/archives/CFAM8E9RN">#appsec-program</a> channel!), <a href="https://twitter.com/omerlh">twitter</a>  - or here in the comments.</body></html>

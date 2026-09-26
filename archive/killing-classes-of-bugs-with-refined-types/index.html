@@ -1,0 +1,25 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Killing Classes of Bugs with Refined Types</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2021-07-23. Tools and advice may be out of date.</p><h1>Killing Classes of Bugs with Refined Types</h1><p>A lot of application security defence mitigation fall into validation and sanitization. Many nasty bugs like XSS, SQLi, command injection etc can be avoided by just doing good input validation. Problem is - input validation is boring, and also - sometimes pretty complex. But it doesn't have to be that way - and this is where using a language like <a href="https://www.scala-lang.org/">Scala</a> can help us out. Let's see how!</p>
+<p><h2>The problem with Typescript</h2></p>
+<p><a href="https://www.typescriptlang.org/">Typescript</a> is an amazing language: All the good of JavaScript, with proper typing systems. This is why for a very long time, Typescript was my prefered language for a very long time. The problem is, Typescript typing are artificial - they are enforced only on "compile" time - when compiling the Typescript code to Javascript. Let's take a look at one example:</p>
+<p><div class="wp-block-image is-style-default"><p class="note">[Image not available in the archive]</p></div></p>
+<p>What will happen?</p>
+<p><div class="wp-block-group">
+Well, surprisingly (at least for me) this is a valid code. It will "compile" and run without any errors - printing <code>string</code> as the result.
+</div></p>
+<p>So, apparently, if we write our server in Typescript we cannot even trust the types of data we receive! We might have a strongly typed interface defined for the user input - but those are only on "compile" time. And this makes the challenge of input validation even harder.</p>
+<p><h2>Scala?</h2></p>
+<p>Scala (like Kotlin) is yet another language that compiles to Java bytecode and can run on JVM. It has many benefits, especially "many of Scala's design decisions are aimed to address <a href="https://en.wikipedia.org/wiki/Criticism_of_Java">criticisms of Java</a>.<sup><a href="https://en.wikipedia.org/wiki/Scala_(programming_language)#cite_note-overview-7">[7]</a></sup> (according to <a href="https://en.wikipedia.org/wiki/Scala_(programming_language)">wikipedia</a>)</p>
+<p><div class="wp-block-group">
+Well, that's a good start for a language, right? We all hate Java, so Scala should be a good thing!
+</div></p>
+<p>Anyhow, recently I started to look into Scala (thank you Baden Delamore for showing me the light!). Not like Typescript, Scala has a real typing system, so issues like the one we just saw in Typescript are irrelevant. But this is not all. Using <a href="https://github.com/fthomas/refined">Refined</a>, we can embed input validation into our typing system. Let's see an example!</p>
+<p><div class="wp-block-image"><p class="note">[Image not available in the archive]</p></div></p>
+<p>Using Refined, we can define our custom types with the required input validation - and move all the mess of input validation to the edge. Now, if I will try to pass a user email that is invalid, the JSON serialization will fail - results in 400 bad request status code. When writing my code, I can focus only on the logic, without the need to worry about input validation. </p>
+<p><div class="wp-block-group">
+And it is even more powerful - Refined types can be used for any input you can handle. For example, the popular ORM [Slick](https://scala-slick.org/) has support for Refined types - meaning, you can always trust the data you are fetching from your database. 
+</div></p>
+<p><h2>Wrapping Up</h2></p>
+<p>Refined types help us kill classes of bugs just by well defining our typing systems. It has also other benefits, as well defined types (vs using arbitrary Strings everywhere) makes the code clearer and reduced bugs. This is exciting news both for us, Application Security Engineers and for developers, as it could free us all to focus on other, more exciting news. </p>
+<p><div class="wp-block-group">
+Does it mean we all have to start writing Scala? Not necessary. The same thing can be done with any language that supports a real typing system (as in "Not Typescript"). Which language are you using? Maybe it has a similar library to Refined? Make sure to let me know!
+</div></p></body></html>

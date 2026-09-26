@@ -1,0 +1,204 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nginx Ingress: The Security Hero We Need!</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2021-10-22. Tools and advice may be out of date.</p><h1>Nginx Ingress: The Security Hero We Need!</h1>I love <a href="https://kubernetes.github.io/ingress-nginx/" target="_blank" rel="noreferrer noopener">Nginx Ingress</a>! It is a very powerful Kubernetes Ingress, with so many capabilities.
+
+
+
+But I think it does not get enough appreciation in the AppSec world. Just by using Nginx Ingress, you could get so many security features for almost free. And even better, you can enable them once - and every workload in the cluster will have them!
+
+
+
+For example, you can monitor and chase after developers to enable security headers. Or just do it once, test it once, and forget. That's it. An entire class of bugs doesn't exist anymore. Isn't that existing?
+
+
+
+Let's see what else Nginx ingress can do for us!
+
+
+
+
+
+
+
+
+<h2>Wait, what is an Ingress?</h2>
+
+
+
+
+In <a href="https://kubernetes.io/">Kubernetes</a> world, an <a href="https://kubernetes.io/docs/concepts/services-networking/ingress/" target="_blank" rel="noreferrer noopener">Ingress Controller</a> allows you to expose a workload to the external world, outside your cluster. There are many controllers, but Nginx Ingress is one of the most popular ones. It is basically a deployment of the very popular <a href="https://www.nginx.com/" target="_blank" rel="noreferrer noopener">Nginx</a> web server, with a Kubernetes controller. The controller translates Ingress API into the Nginx configuration file. Meaning, any (well, most) of the things you can do with Nginx - you can do with Nginx Ingress. And there is a lot you can do...
+
+
+
+
+<h2>Security Headers</h2>
+
+
+
+
+I started with this example at the beginning of the post. <a href="https://owasp.org/www-project-secure-headers/" target="_blank" rel="noreferrer noopener">Security Headers</a> are HTTP headers that you can add to the HTTP response and can improve the security of your website. For Example, the Strict-Transport-Security header instructs the browser to redirect any HTTP request to HTTPS - before it lives the browser.
+
+
+
+This is why there are many security tools out there testing a website for security headers. And many AppSec folks waste their time triaging reports on missing headers. And many developers spend a lot of their time adding them to their websites.
+
+
+
+Well, this is pretty boring, right? Lucking, with Nginx Ingress you can configure it once for <strong>all</strong> the ingress inside the cluster! For example, if you deploy Nginx ingress using <a href="https://helm.sh/" target="_blank" rel="noreferrer noopener">Helm</a>, you can simply configure the <a href="https://github.com/kubernetes/ingress-nginx/blob/main/charts/ingress-nginx/values.yaml#L47" target="_blank" rel="noreferrer noopener">chart</a> to add any security header you'd like:
+
+
+
+
+<pre class="wp-block-code"><code>controller:
+  addHeaders:
+    Strict-Transport-Security: max-age=604800; includeSubDomains</code></pre>
+
+
+
+
+Just deploy the controller with these settings, and you're done. You can now forget about STS for the rest of your life!
+
+
+
+
+<h2>IP Filtering</h2>
+
+
+
+
+Imagine you want to limit which IPs could call your service. There are many reasons to do so. For example, maybe it's a webhook that responds to GitHub events. There is no reason someone outside GitHub will ever call it - so why not limit it only to GitHub IPs?
+
+
+
+And here is where Nginx really shines: You can configure it either once in the controller (like we did at the previous example) or per ingress with annotations, which is a better fit for this case:
+
+
+
+
+<pre class="wp-block-code"><code>apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: github-handler
+  annotations:    
+    nginx.ingress.kubernetes.io/whitelist-source-range: &lt;GitHub IP range / CIDRS&gt;</code></pre>
+
+
+
+
+Now, just deploy the ingress with this annotation. If you'll try calling it outside those IPs, you will get 403 Forbidden from Nginx:
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+And the request didn't even hit your service. Isn't that cool?
+
+
+
+
+<h2>Path Blocking</h2>
+
+
+
+
+<a href="https://prometheus.io/" target="_blank" rel="noreferrer noopener">Prometheus</a> is a very popular metric solution, with one small downside: It is pull-based instead of push. Meaning, to expose metrics you're website need to expose the <code>/metrics</code> endpoint with all of its internal metrics (See my <a href="https://www.cncf.io/wp-content/uploads/2020/12/Hacking-Monitoring-CNCF-Sarah-Conway.pdf" target="_blank" rel="noreferrer noopener">talk</a> about it for more details). How do you allow only internal traffic to access this endpoint (or any other endpoint like health check)? Nginx to the rescue!
+
+
+
+
+<pre class="wp-block-code"><code>kind: Ingress
+metadata:
+  name: very-secure-service
+  labels:
+  annotations:
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location /metrics {
+        return 401;
+      }</code></pre>
+
+
+
+
+Using an annotation, we can add a specific Nginx configuration to the one generated by the controller. Here, we instruct Nginx to return 401 each time someone accesses the <code>/metrics</code> endpoint. Neat!
+
+
+
+
+<h2>Rate Limiting</h2>
+
+
+
+
+This is a very popular security controller. To prevent <a href="https://owasp.org/www-community/attacks/Denial_of_Service" target="_blank" rel="noreferrer noopener">denial-of-service</a> attacks, one of the simplest mitigations is to limit how many requests a user can send. Not so surprising, Nginx supports this too. There are many options here (see the <a href="https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#rate-limiting" target="_blank" rel="noreferrer noopener">documentation</a> for more details), so make sure to choose the one that fits your use-case...
+
+
+
+
+<h2>Web Application Firewall (WAF)</h2>
+
+
+
+
+A <a href="https://owasp.org/www-community/Web_Application_Firewall" target="_blank" rel="noreferrer noopener">WAF</a> is a tool that inspects the incoming traffic and tries to block various attacks. While regular firewalls work on the network level, WAF focused on the application level and usually understands application protocols well - protocols like HTTP.
+
+
+
+While there are many WAF solutions out there (and many of them are very expensive), Nginx ingress comes with the free and open-source WAF ModSecurity. You can easily enable it (see the documentation) and easily customize it. OWASP maintains a list of <a href="https://github.com/coreruleset/coreruleset" target="_blank" rel="noreferrer noopener">security rules</a> you can use, and you even can pretty easily author your own rules.
+
+
+
+
+<h2>Authentication</h2>
+
+
+
+
+One of the things that keep me awake at night is how secure are our internal tools. Especially open source tools like Prometheus or Alert Manager that usually don't come with authentication. And this is just another thing Nginx ingress can solve for us! Nginx Ingress can integrate with a tool like <a href="https://oauth2-proxy.github.io/oauth2-proxy/" target="_blank" rel="noreferrer noopener">OAuth Proxy</a>, allowing you to offer every developer "one-click" SSO authentication - just by adding an <a href="https://kubernetes.github.io/ingress-nginx/examples/auth/oauth-external-auth/" target="_blank" rel="noreferrer noopener">annotation</a> to their ingress. And that's it, one huge problem just went away...
+
+
+
+
+<h2>Road Paving</h2>
+
+
+
+
+All the things I mentioned here (well, most of them) can be configured either at the controller level (enabled for all ingresses) or per ingress (check the <a href="https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/" target="_blank" rel="noreferrer noopener">documentation</a> to find out). This gives you a lot of room to pave the road and free developers from the need to worry about those things:
+
+
+
+
+<ul><li>Using different ingress controller with different settings - for example, one for web application configured with the best security headers and one for REST APIs without them. Developers just need to use the right one, and the rest is taken care of.</li><li>Using templating tools like <a href="https://helm.sh/" target="_blank" rel="noreferrer noopener">Helm</a>, <a href="https://kustomize.io/" target="_blank" rel="noreferrer noopener">Kustomize</a> or <a href="https://jsonnet.org/" target="_blank" rel="noreferrer noopener">Jsonnet</a> to provides templates with all the security goodies. For example, a template that abstract the rate limiting annotations, freeing developering from understanding how to configure it.</li><li>Using tools like <a href="https://github.com/open-policy-agent/gatekeeper" target="_blank" rel="noreferrer noopener">GateKeeper</a> to enforce specific annotations - for example, all services must use the path block annotations, otherwise the deployment is denied.</li></ul>
+
+
+
+
+And there are many other ways you could explore!
+
+
+
+
+<h2>Wait, what about *** Ingress?</h2>
+
+
+
+
+There are many many many ingress controllers out there. Are you not using Nginx ingress right now? The one you are using probably offers some of those features (and maybe others, that Nginx doesn't). It's time to dig into the docs to find out :)
+
+
+
+
+<h2>Wrapping Up</h2>
+
+
+
+
+I started this post by saying how much I love Nginx Ingress. I hope you're now starting to understand why!
+
+
+
+Now it's the time for you to take an action - which features you're going to enable today, to make the world a bit more secure?
+
+
+
+Featured image - Photo by <a href="https://unsplash.com/@tkristin?utm_source=unsplash&amp;utm_medium=referral&amp;utm_content=creditCopyText">TK Hammonds</a> on <a href="https://unsplash.com/s/photos/hero?utm_source=unsplash&amp;utm_medium=referral&amp;utm_content=creditCopyText">Unsplash</a>. Thank you!</body></html>

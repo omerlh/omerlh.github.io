@@ -1,0 +1,224 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Solving Trust Issues at Scale</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2020-01-22. Tools and advice may be out of date.</p><h1>Solving Trust Issues at Scale</h1>Microservices are social constructs: they can’t function without talking with other services. This also raises an interesting question: do we trust all of our microservices?
+
+
+
+Not all microservices are the same: some are more sensitive - for example, services that handle personal user data or payment information. Others are user-facing and therefore riskier. We shouldn’t treat all services as equal. A robust mechanism that describes who can talk with who is required. Let's see how!
+
+
+
+
+
+
+
+
+<h2>Adding Authentication</h2>
+
+
+
+
+The first step is adding authentication - you can't perform authorization without knowing who is talking with you. There are many popular ways to perform authentication, while the most popular are <a href="https://en.wikipedia.org/wiki/Mutual_authentication">mTLS</a> and <a href="https://jwt.io/introduction/">JSON Web Token</a> (JWT) - which I'm going to focus on. 
+
+
+
+While implementing JWT authentication is not hard, re-implementing it over and over again in each microservice is hard and error-prone. Also, not all languages have good support for JWT(see the comparison <a href="https://jwt.io/#libraries">here</a>). This is where the <a href="https://docs.microsoft.com/en-us/azure/architecture/patterns/sidecar">sidecar design pattern</a> comes handy - by offloading the authentication task to another container, running on the same pod. 
+
+
+
+<a href="https://www.envoyproxy.io">Envoy Proxy</a> is a perfect fit for this task - it can do a lot of cool stuff related to ingress and egress traffic, including handle JWT authentication (and also mTLS!). All we need to do is adding a <a href="https://www.envoyproxy.io/docs/envoy/latest/api-v2/config/filter/http/jwt_authn/v2alpha/config.proto">JWT authentication filter</a>:
+
+
+
+
+<pre class="wp-block-code"><code>- name: envoy.filters.http.jwt_authn
+  config: 
+    providers:
+      identity-server:
+        issuer: http://oauth-server
+        payload_in_metadata: jwt-metadata
+        audiences:
+        - api1
+        remote_jwks:
+          http_uri:
+            uri: http://localhost/.well-known/openid-configuration/jwks
+            cluster: identity-server
+          cache_duration:
+            seconds: 86400
+    rules:
+      - match:
+          prefix: /stats/prometheus
+      - match:
+          prefix: /
+        requires:
+          provider_name: identity-server</code></pre>
+
+
+
+
+This short code snippet configured all that we need to validate a JWT token: how to fetch the signing keys to validate the signature (<code>remote_jwks</code>), the required audience claim (<code>audiences</code>) and the issue (<code>issuer</code>). We can also specify which routes require authentication and which not (the <code>rules</code> section). Very powerful. And the best part - we can add it to any application we have, no matter which language it is written with!
+
+
+
+
+<h2>Adding Authorization</h2>
+
+
+
+
+Now that we have authentication, it's time to add the next layer - authorization. Envoy can add a layer of authorization by offloading this task to another service (see the <a href="https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/ext_authz_filter#arch-overview-ext-authz">docs</a> for more details). For each incoming request, envoy will call this service, and based on the service response it will either approve or deny the request.
+
+
+
+This is very nice, but not so helpful for us - we still need to implement the authorization logic! This is where we can use another open-source - Open Policy Agent (OPA). OPA is a policy system: you can write policies using DSL called rego, and use OPA to evaluate them and return a result (also called a decision). It might sound confusing, so let's take a look at a short example:
+
+
+
+
+<pre class="wp-block-code"><code>package opa.demo.b
+
+default allow=false
+
+allow {
+    input&#91;"candies"] &lt; 5
+}</code></pre>
+
+
+
+
+This is a very simple policy, that lives in a package <code>opa.demo.b</code>. The value of the policy is based on a special variable - <code>input</code> that represent any input to the policy. The policy will return a different decision based on the input. For example, given the input <code>candies=4</code>, the decision will be false (4 &lt; 5).  Refer to the <a href="https://www.openpolicyagent.org/docs/latest/#example">docs</a> for a full example.
+
+
+
+We can use the same mechanism for building our authorization policies. Let's take a look at a simple authorization policy. This time, the input will be - the incoming request. Our policies can look at various request properties (method, path, body, client ip, etc) and based on those properties decide if the request is allowed or not:
+
+
+
+
+<pre class="wp-block-code"><code>package common.service2service
+import data.services
+import input.attributes.request.http as http_request
+
+default allow = false
+
+jwt_payload = _value {
+    verified_jwt := input.attributes.metadata_context.filter_metadata&#91;"envoy.filters.http.jwt_authn"]&#91;"fields"]&#91;"jwt-metadata"]
+    _value := {
+        "client_id": verified_jwt&#91;"Kind"]&#91;"StructValue"]&#91;"fields"]&#91;"client_id"]&#91;"Kind"]&#91;"StringValue"]
+    }
+}
+
+allow {
+    jwt_payload.client_id == 'service-a'
+    http_request.path == 'api/v1/pii'
+    http_request.method == 'GET'
+}</code></pre>
+
+
+
+
+The policy is the last 5 lines of this snippet - the request will be allowed if and only if it matches those properties. Any other request will be denied. This gives us the ability to build a least privileges policy, granting only the required access for each consumer. For more details about OPA integration with Envoy, please refer to the <a href="https://www.openpolicyagent.org/docs/latest/envoy-authorization/">docs</a>.
+
+
+
+
+<h2>Scaling Our Policies</h2>
+
+
+
+
+While OPA is a very powerful tool, it has one downside - Rego is just another thing devs need to know and master. If we want to scale our authorization system, we need to create an abstraction, that will make the adoption easier. This can be done easily by using OPA data files.
+
+
+
+A data file is simply a JSON or YAML file, representing a data model that can be consumed by our policies. For example, this data file contains an array of all the clients that allowed to access service:
+
+
+
+
+<pre class="wp-block-code"><code>{
+    "services": 
+    &#91;
+        {
+            "client_id": "client",
+            "allowed_routes": &#91;
+                {
+                    "path": "/api/v1/sensitive",
+                    "method": "GET"
+                }
+            ]
+        }
+    ]
+}</code></pre>
+
+
+
+
+It's the same data that was represented before in our policies, just this time it's modeled in JSON instead of Rego. JSON is more familiar to devs, and can have a scheme - making it a lot easier to use. Now, we can author generic policies that consume this data file:
+
+
+
+
+<pre class="wp-block-code"><code>package common.service2service
+import data.services
+import input.attributes.request.http as http_request
+
+default allow = false
+
+jwt_payload = _value {
+    verified_jwt := input.attributes.metadata_context.filter_metadata&#91;"envoy.filters.http.jwt_authn"]&#91;"fields"]&#91;"jwt-metadata"]
+    _value := {
+        "client_id": verified_jwt&#91;"Kind"]&#91;"StructValue"]&#91;"fields"]&#91;"client_id"]&#91;"Kind"]&#91;"StringValue"]
+    }
+}
+
+allow {
+    jwt_payload.client_id == services&#91;i].client_id
+    http_request.path == services&#91;i].allowed_routes&#91;j].path
+    http_request.method == services&#91;i].allowed_routes&#91;j].method
+}</code></pre>
+
+
+
+
+It's almost the same policy as before, just this time there is no hardcoded values - the policies consume the data file and used it to evaluate the decision (see the <code>import data.services</code> - this is how we import the data file!). 
+
+
+
+
+<h2>Putting it All Together</h2>
+
+
+
+
+So now we have a single, generic policy (maintained by our AppSec team). Each service has its own data file, representing who can access this service. A permission request is just a PR to the relevant service data file - a change that is very easy to review (and maybe, in a later phase, even add some static analysis on top of it). 
+
+
+
+The only part left is how our service can consume our policies - and this is where another OPA feature comes handy - the bundle APIs. Policies can be archived into policy bundles, and those bundles can be uploaded into <a href="https://www.openpolicyagent.org/docs/latest/external-data/#option-3-bundle-api">bundle services</a> (for example, S3). OPA supports hot bundle loading - so changes to our policies can be applied without restarting our service.
+
+
+
+And now we have a complete authorization system. To run it locally, clone the <a href="https://github.com/omerlh/opa-demo">demo repository</a> and follow the readme. The demo has all the components I described here, and you can play with them to have a better feeling of the system. You can also use it as an implementation reference if you want to build something similar in production. 
+
+
+
+
+<h2>Wrapping Up</h2>
+
+
+
+
+Authorization is crucial for building a really secure system. But it's as important to build an authorization system that devs will not hate (that much :)). In this post, I shared the approach we did, leveraging GitOps for authorization requests. A simple flow looks like the following:
+
+
+
+
+<ul><li>Dev opens a PR, with changes to the relevant service data file.</li><li>The PR is reviewed by the service owner (AppSec team - you might also want to review sensitive services.)</li><li>Once the PR is approved and merged to muster, the policies are bundled and uploaded to the server. OPA will load the new policies and the changes are live in production - without restarting the service.</li></ul>
+
+
+
+
+I'm looking forward to hearing your thoughts about this approach. Did you find it interesting? Do you want to build something similar? Please don't hesitate to reach out!
+
+
+
+In case you find it interesting, consider viewing my <a href="https://www.youtube.com/watch?v=yuFZsfnHqo0&amp;list=PL8tivQAdoavPh74xwoPI23CW-ToU-2oIM&amp;index=5&amp;t=0s">talk</a> from DevOps Days Tel Aviv 2019 - which covers it in depth.</body></html>

@@ -1,0 +1,150 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Istio in Production?</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2019-11-27. Tools and advice may be out of date.</p><h1>Istio in Production?</h1><a href="https://istio.io/">Istio</a> is one of the most popular <a href="https://en.wikipedia.org/wiki/Service_mesh">service mesh</a>. It can help in solving many issues that surface when running a lot of microservices - things like authentication, authorization, observability and traffic routing. It all sounds really promising, so we decided to give it a try at <a href="https://www.solutotlv.com/">Soluto</a>. During the process of deploying it on an existing cluster and enabling it on existing workloads, I faced a lot of <em>interesting</em> issues. Let me share some of them with you.
+
+
+
+
+
+
+
+
+<h2>A production deployment?</h2>
+
+
+
+
+Istio is a really complex product. It has a few moving parts that are required for a functional deployment. This diagram shows all Istio components, you can learn more about it on the <a href="https://istio.io/docs/ops/architecture/">official docs</a>:
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+Which got me wonder - what do I need to monitor? Which one of those components is critical and which not? Do we need to wake up in the middle of the night if Mixer is down? Unfortunately, I couldn't find <a href="https://discuss.istio.io/t/monitoring-istio-components/3091/4">clear answers to these questions</a>. Istio has really good<a href="https://grafana.com/orgs/istio/dashboards"> Grafana dashboards</a> for each one of those components. Using the dashboards, you can find important metrics to monitor like Pilot push errors. Does that enough? I don't know. Besides monitoring, it's also important to ensure that all those components are highly-available:
+
+
+
+
+<pre class="wp-block-code"><code>mixer:
+  policy:
+    replicaCount: 2
+    autoscaleEnabled: true
+    autoscaleMin: 2
+    autoscaleMax: 10
+  telemetry:
+    replicaCount: 2
+    autoscaleEnabled: true
+    autoscaleMin: 2
+    autoscaleMax: 10
+pilot:
+  autoscaleEnabled: true
+  autoscaleMin: 2
+  autoscaleMax: 10
+  traceSampling: 20</code></pre>
+
+
+
+
+In addition, Istio has a dependency on other tools like <a href="https://grafana.com/">Grafana</a>, <a href="https://prometheus.io/">Prometheus</a>, <a href="https://www.jaegertracing.io/">Jaeger</a>, and <a href="https://kiali.io/">Kiali</a>. Istio can install all of them - but only for demo purposes. Running them in production is feasible only by installing them with Helm/relevant operator. And at this point, you also have to solve issues like Kiali authentication or Jaeger storage.
+
+
+
+
+<h2>A safe rollout</h2>
+
+
+
+
+After installing Istio, the next step is to start rolling it out onto the existing workloads. By enabling <a href="https://istio.io/docs/ops/setup/injection-concepts/">side-car injection</a>, we can enable Istio on the relevant workload. The injector use namespace labels for detecting the relevant workloads (see injection rules <a href="https://istio.io/docs/ops/setup/injection-concepts/">here</a>). So I decided to enable it on one namespace and see what will happen. Apparently, things did not end up well:
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+What happened? I deleted all the pods in the namespace (<strong>never</strong> do that!), so all the new pods go re-created. The namespace was labeled, so the sidecar injected. And for some reason, the proxy used a lot of CPU, more than what it requested. The HPA noticed that, and scale up the pods. Which did not help - so it keeps scaling them up. The solution was to define larger requests for the proxy using the following annotations:
+
+
+
+
+<pre class="wp-block-code"><code>apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  annotations:
+    sidecar.istio.io/proxyCPU: "800m"
+    sidecar.istio.io/proxyMemory: "1Gi"</code></pre>
+
+
+
+
+
+<h2>The Hidden Cost</h2>
+
+
+
+
+Istio is an open-source, but still - you're going to pay for using it. Why? Because it's adding another sidecar (<a href="https://www.envoyproxy.io/">Envoy</a> proxy), running on <strong>all the pods in your clusters</strong>. This was not something I was thinking about before starting to play with Istio. So the question is - how much it is going to cost? 
+
+
+
+This really depends on how much resources Istio consumes. I noticed that on a few services it consumes less than 10ml CPU, but on others, it can take up to 800ml CPU (see the previous section). Why? Not sure. Istio has a pretty good page on <a href="https://istio.io/docs/ops/performance-and-scalability/">performance</a>, but it did not match what we experienced (see the issue <a href="https://github.com/istio/istio/issues/15883">here</a>):
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+See the highest bars? These are containers on the Grafana pod - which almost don't get any traffic. So to answer the cost question - it really depends, and the only way to know for sure is by trying. One thing to notice - the default CPU request for the proxy is 100ml CPU, which is a lot more than it needs. Setting it to a lower value can save you a lot of money:
+
+
+
+
+<pre class="wp-block-code"><code>global:
+  proxy:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limit:
+        cpu: 100m
+        memory: 1024Mi</code></pre>
+
+
+
+
+
+<h2>Other Issues</h2>
+
+
+
+
+While rolling out Istio, I noticed a few other small issues:
+
+
+
+
+<ul><li>Istio does not play well with cronjobs/jobs (see this <a href="https://github.com/istio/istio/issues/11659">issue</a>). As it not adding too much value to most of the jobs, it might be easier to start with disabling it on those objects.</li><li>Istio proxy adds headers to all outgoing requests, which leaks information (x-envoy-upstream-service-time, x-envoy-decorator-operation). You might want to remove those headers on your ingress configuration.</li><li>Tracing is not trivial. Even with Istio, you still need to <a href="https://istio.io/docs/tasks/observability/distributed-tracing/overview/#trace-context-propagation">propagate the tracing headers</a>. Meaning, you still need to instrument your code with tracing. Istio just makes it a bit easier to instrument your code. Also, if you're using Nginx ingress you might want to enable it's <a href="https://kubernetes.github.io/ingress-nginx/user-guide/third-party-addons/opentracing/">tracing module</a>.</li></ul>
+
+
+
+
+
+<h2>Wrapping Up</h2>
+
+
+
+
+Istio is a very powerful tool, but deploying it into an existing cluster is not trivial at all. If you do decide to follow this route, remember that:
+
+
+
+
+<ul><li>This is going to be a very long journey. A safe rollout is slow and manual, that requires a very careful restart of all the workloads on the cluster, and in some cases fine-tuning.</li><li>Istio has it's own price - prepare to see an increase in resource usage!</li><li>Production deployment is not trivial. I touched only some issues here, but things are a lot more complex when you have multiple clusters.</li></ul>
+
+
+
+
+Looking forward, I do hope to solve those issues and be able to leverage service mesh in production soon. Maybe trying <a href="https://aws.amazon.com/app-mesh/">AWS AppMesh</a> or <a href="https://linkerd.io/">Linkerd</a> could help with some of those issues. As an alternative, using API Gateway (like <a href="https://docs.solo.io/gloo/latest/">Gloo</a> or <a href="https://www.kongcompany.com/">Kong</a>) could give us some of the value, at a lot smaller cost. Where are we heading? It's still too early to say :)</body></html>

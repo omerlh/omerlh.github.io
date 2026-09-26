@@ -1,0 +1,97 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Threat Modeling as Code</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2019-01-19. Tools and advice may be out of date.</p><h1>Threat Modeling as Code</h1><p style="text-align: left;">Infrastructure-as-code (and GitOps) extend the use of source control (git) and code (well, manifest files) into a new field. This changed radically how we create infrastructure in the cloud, by making the process more robust and less error prone, and also easier for developers. Can we do the same for threat modeling? How can threat-modeling-as-code change and improve the way we do threat modeling today?</p>
+
+<p style="text-align: left;">Let's start with a really short introduction to threat modeling. Threat modeling is a practice that help us take a system design and look for possible security issues, by asking these 4 questions:</p>
+
+<ol style="text-align: left;">
+    <li>What are we building?</li>
+    <li>What can go wrong?</li>
+    <li>What are we doing about it?</li>
+    <li>Are we doing a good job?</li>
+</ol>
+
+<p style="text-align: left;">Conduction a threat model helps to find issues sooner - and in most cases, detect issues that are hard to find using other practices. This is why conducting a threat model is a critical part in building a secre software. If you're not familiar with this practice, I'm highly recommending this <a href="https://misti.com/infosec-insider/threat-modeling-what-why-and-how">post</a> by Adam Shostack, one of the authorities in the field. <a href="https://www.owasp.org/index.php/Application_Threat_Modeling">OWASP Threat Modeling project</a> (and channel) is also an excellent learning resource.</p>
+
+<p style="text-align: left;"></p>
+
+<h2 style="text-align: left;">Infrastructure-As-Code approach</h2>
+
+<p style="text-align: left;">I like working with Git, and especially <a href="https://guides.github.com/introduction/flow/">GitHub PR flow</a>. The idea is simple: one single master branch, which is kept "green" (e.g. all tests are passing - meaning, the code is working as expected). When I want to work on a feature, I create a branch, write my code and push the branch. Than, I can open a pull-request (PR) - a request to pull the changes from my branch to the master branch. What happens on a PR?</p>
+
+<ul style="text-align: left;">
+    <li>Tests are running to assess the quality of my changes. Based on the tests results, the PR can be approved or denied.</li>
+    <li>Code review. Someone can take a look on my code and decide if my PR is approved or not.</li>
+</ul>
+
+<p style="text-align: left;">This flow is so common, that is now used for more than just code. For example, using <a href="https://github.com/github/octodns">OctoDNS</a>, all DNS changes are done by git. This allows every developer to apply DNS changes, and still make sure it stays secure and safe. Another example is <a href="https://www.terraform.io/">Terraform</a>, which let you manage cloud infrastructure as code, using manifest files to describe the required resources. This let you create databases, servers or anything else only by using git. All these are examples to <a href="https://www.weave.works/blog/gitops-operations-by-pull-request">GitOps</a> - operations using git. GitOps is so popular and loved by developers because it is implemented by tools that are familiar and known by developers.</p>
+
+[caption id="" align="aligncenter" width="500"]<span class="note">[Image not available]</span> source: <a href="http://www.gilzilberfeld.com/2016/11/agile-introduction-to-devops-ship-ahoy.html">Gil Zilberfeld</a>[/caption]
+
+<h2 style="text-align: left;">Threat-Modeling-As-Code</h2>
+
+<p style="text-align: left;">How is all that related to threat modeling? Just imagine we could have the same for threat modeling. Any time someone want to conduct a threat model, she would open a PR with her changes to a repository. On the PR we can:</p>
+
+<ul style="text-align: left; line-height: 2;">
+    <li>Run tests: From tests that validates the threat model, to more sophisticated tests that can detect automatic issues ("static analysis"). Imagine, for example, that we can add clear-text connection threat to all network connections. Maybe we can even fail the test on specific threats? Saying, if there is even one connection that is clear-text, the PR is blocked? So many possibilities here.</li>
+    <li>Perform a review: The developer can ask many people to review the threat modeling and add their insights. This can either happen asynchronous, or as part of a threat modeling meeting. The PR become the place where the threats are documented. Later, we can link the issues we decided to fix to this PR.</li>
+</ul>
+
+<p style="text-align: left;">Moving to a threat-modeling-as-code opens up new possibilities. The main motivation, at least in my opinion, is moving to tools that are used, loved and known by developers. How? Let me introduce two tools you can start using today for threat-modeling-as-code.</p>
+
+<h2 style="text-align: left;">PlantUML - drawing-as-code</h2>
+
+<p style="text-align: left;">The first tool is <a href="http://plantuml.com/">PlantUML</a>, a language that let you create a drawing, using a specific <a href="https://en.wikipedia.org/wiki/Domain-specific_language">DSL</a> (domain-specific language). Take for example the following "code" (this is the official example from <a href="http://plantuml.com/sequence-diagram">here</a>):</p>
+
+<pre class="wp-block-code"><code>@startuml
+Alice -&gt; Bob: Authentication Request
+Bob --&gt; Alice: Authentication Response
+
+Alice -&gt; Bob: Another authentication Request
+Alice &lt;-- Bob: Another authentication Response
+@enduml</code></pre>
+
+<p style="text-align: left;">This very simple code is translated to the following diagram:</p>
+
+<div class="wp-block-image" style="text-align: left;">
+<p class="note">[Image not available in the archive]</p>
+</div>
+
+<p style="text-align: left;">PlantUML allows us to create a drawing using code (and it has so many features for creating a complex diagram, including numbering, type of participants and more). This free us from messing with the actual drawing of the diagram. And, because this is normal code, we can have review comments on it (see an example PR <a href="https://github.com/omerlh/plantuml-example/pull/1/files">here</a>):</p>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: left;">What about testing? PlantUML language is simple, writing a SAST tool should be an easy task. There are existing solutions already - for example, <a href="https://github.com/mike-goodwin/owasp-threat-dragon">OWASP Threat Dragon</a> has a rules engine that can generate threats and mitigations automatically. <a href="https://www.microsoft.com/en-us/securityengineering/sdl/threatmodeling">Microsoft Threat Modeling Tool</a> can do the same. All that we need is import PlantUML files into one of these tools, and we can easily have testing.</p>
+
+<p style="text-align: left;">And what about templating? In the basis, the things we build are usually similar - a web API that handles HTTP request, a worker that read from a queue, mobile application that interact with an API etc. Using PlantUML we can create ready-made templates, with the generic flow and potential threats. Developers just need to copy the template, modify according to the specific use case and review the threats. PlantUML opens so many possibilities, just by enabling diagram-as-code.</p>
+
+<h2 style="text-align: left;">Gherkin - threats-as-code</h2>
+
+<p style="text-align: left;">Drawing a diagram is only the first part of conducting a threat model. After drawing it, we need to look for potential threats, prioritize them and discuss potential mitigations. <a href="https://docs.cucumber.io/gherkin/">Gherkin</a> is a language for writing user stories and scenarios, and it is commonly used for <a href="https://en.wikipedia.org/wiki/Behavior-driven_development">Behavior Driven Development</a>. Threats and controls are just user stories, so we can use Gherkin to document them. A great example of using Gherkin for this purpose is <a href="https://github.com/owasp-cloud-security/owasp-cloud-security">OWASP Cloud Security Project</a> (thank you, <a href="https://twitter.com/zeroXten">Fraser Scott,</a> for the project, and for the inspiration!). The project goal is to document threats and controls that are relevant to applications running in a cloud environment. Let's take a look at one example <a href="https://github.com/owasp-cloud-security/owasp-cloud-security/blob/master/features/aws/ec2/threats/ocst_1_1_3_metadata_ssrf.feature">threat</a>:</p>
+
+<pre class="wp-block-code"><code>  Scenario: Getting the security credentials
+    When the attacker injects a request to http://169.254.169.254/latest/meta-data/iam/security-credentials/ROLE_NAME
+    Then the temporary security credentials for ROLE_NAME are returned</code></pre>
+
+<p style="text-align: left;">And this is the matching <a href="https://github.com/owasp-cloud-security/owasp-cloud-security/blob/master/features/aws/ec2/controls/ocsc_1_1_3_limit_exposure_of_metadata_service.feature">control</a>, to mitigate this threat:</p>
+
+<pre class="wp-block-code"><code>  Scenario: Application is protected against Server Side Request Forgery
+    Given an EC2 instance with access to the metadata service
+    And an application running on the instance
+    When we inject a request to the http:/169.254.169.254 metadata service URL
+    Then the application must not call the provided metadata service URL
+    And the application must not return any results of a call to the metadata service</code></pre>
+
+<p style="text-align: left;">Using Gherkin language (and more in general, using user stories) to document threat and control makes it a lot easier to understand and prioritize them. Like with PlantUML, adding a review is simple - this is just a text file.</p>
+
+<p style="text-align: left;">What about testing? Gherkin is commonly used for Behavior Driven Development: Writing a scenario using Gherkin, and having a code that generates tests automatically from this scenario. For example, for the threat above - the code should generate a test for SSRF vulnerability in the API. There is some development in this area ([Threat Playbook](https://en.wikipedia.org/wiki/Behavior-driven_development) is a great example of automatic security tests), and I hope we see more tools like that.</p>
+
+<p style="text-align: left;">Using Gherkin we can also create threat libraries easily (like Cloud Security Project which I mentioned earlier). Developers can refer to the library when conducting a threat model, and choose the relevant threats for their use case. The library should contain common controls to mitigate these threats - so all that is left is just choose the right control and implement it.</p>
+
+<h2 style="text-align: left;">Wrapping Up</h2>
+
+<p style="text-align: left;">When I worked on releasing Kamus, our secret management solution for Kubernetes, I looked on how it will be best to release publicly the <a href="https://github.com/Soluto/kamus/tree/master/docs/features">threat model</a> - in order to share the threat and mitigations that were discussed. Combining the power of PlantUML and Gherkin was a great choice for this use case (I'm still looking for a good solution to generate a web site). This is another benefit of threat-modeling-as-code, and I hope to see more open-source project following this path in the future.</p>
+
+<p style="text-align: left;">Using PlantUML and Gherkin is only the first step toward threat-modeling-as-code. From my experience, it does make it a bit easier for devs, but the tools are still not mature enough. Having some sort of automated tests could boost up the experience - and hopefully, make threat modeling easier for everyone. Threat modeling is a critical process of building secure software, make it easier (and maybe even fun?) could encourage more developers to adopt it.</p>
+
+Edit:
+
+I just find out the <a href="https://twitter.com/abhaybhargav">Abhay Bhargav</a> gave a <a href="https://www.youtube.com/watch?v=fT2-JuvK428&amp;app=desktop">talk</a> on the same subject at AppSec USA. Thanks, <a href="https://twitter.com/JoshCGrossman">Josh Grossman</a> for sharing this talk!</body></html>

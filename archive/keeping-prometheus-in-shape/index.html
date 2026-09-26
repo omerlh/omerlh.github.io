@@ -1,0 +1,80 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Keeping Prometheus in Shape</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2019-03-04. Tools and advice may be out of date.</p><h1>Keeping Prometheus in Shape</h1><p style="text-align: left;"><a href="https://prometheus.io/">Prometheus</a> is a great monitoring tool. It can easily scrape all the services in your cluster dynamically, without any static configuration. For me, the move from manual metrics shipping to Prometheus was magical. But, like any other technology we're using, Prometheus need special care an love. If not handled properly, it can easily get out of shape. Why does it happen? And how can we keep it in shape? Let's first do a quick recap of how Prometheus works.</p>
+
+<h2 style="text-align: left;">Prometheus Monitoring Model</h2>
+
+<p style="text-align: left;">Prometheus works differently from other monitoring systems - it uses <a href="https://thenewstack.io/exploring-prometheus-use-cases-brian-brazil/">pull over push model</a>. The push model is simple: Just push metrics from your code directly to the monitoring system, for example - <a href="https://graphiteapp.org/">Graphite</a>.</p>
+
+<p style="text-align: left;">Pull model is fundamentally different - the service exposes metrics on a specific endpoint, and Prometheus scrapes them once in a while (the scrape interval - see <a href="https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config">here</a> how to configure it). While there are reasons to prefer push over the pull model, it has its own challenges: Each metric scrape operation can take time; what happens if it the scrape take longer then the scrape interval?</p>
+
+<p style="text-align: left;">For example, let's say Prometheus is configured to scrape its targets (that's how services are called in Prometheus language) once in 20 seconds; what will happen if one scrape takes more then 20 seconds? The result is out of order metrics: instead of having a data point every 20 seconds, it will be every time the scrape completed. What can we do?</p>
+
+<p style="text-align: left;"></p>
+
+<h2 style="text-align: left;">Monitoring the Scrape Duration</h2>
+
+<p style="text-align: left;">The first step is visibility to the scrape duration, using a very simple query:</p>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: left;">The next step is setting an alert - for example, using <a href="https://prometheus.io/docs/alerting/overview/">Prometheus Alert Manager</a>:</p>
+
+<pre class="wp-block-code"><code>alert: ScrapeDuration
+expr: max(scrape_duration_seconds) &gt; 15
+for: 5m
+labels:
+  severity: high
+annotations:
+  summary: "Prometheus Scrape Duration is getting near the limit"</code></pre>
+
+<p style="text-align: left;">Adjust the threshold based on the <code><code>scrape_interval</code></code> configuration - the threshold should be lower than this value. E.g. if the scrape interval is 20 seconds, raise an alert when the scrape duration is 15 seconds. Now that we have an alert it's time to ask: what we can do when the alert raised?</p>
+
+<h2 style="text-align: left;">Taking Action</h2>
+
+<p style="text-align: left;">When the scrape duration is getting near the limit we need to take an action. What we can do? One option is to increase the scrape interval. This is a valid solution, but it has one downside - losing metrics. The scrape interval define the metrics resolution - you cannot have the smallest metrics resolution than the scrape interval. For example, if the scrape interval is one minute, you will have one data point per minute. So increasing scrape interval is possible, but limited - at some point you can't increase it any more.</p>
+
+<p style="text-align: left;">An alternative is to investigate what makes scrape duration to increase. One possible reason is a resource limit - for example, not enough CPU. You can use queries like <code>rate(process_cpu_seconds_total{job='prometheus'}[5m])*100</code>for CPU usage or <code>rate(process_resident_memory_bytes{job="prometheus"}[5m])</code> for memory usage. Use these queries to check for spikes, and consider adding resources if needed.</p>
+
+<p style="text-align: left;">Another reason could be a single scrape target with a lot of time series. For example, an API that uses a user identifier as a label - which has high cardinality (read more about it <a href="https://prometheus.io/docs/practices/naming/#labels">here</a>). This can be the culprit, as it increases the load on Prometheus. The solution is to <a href="https://www.robustperception.io/dropping-metrics-at-scrape-time-with-prometheus">drop</a> the problematic metrics - or modify the code, when possible. This will solve the issue - but not the root cause: a single service can create real damage to Prometheus, and this is dangerous. All that is required is one unaware developer (and I did similar mistakes in the past) who decided to use user identifier as a label (it makes sense!). How can we protect Prometheus from such a mistake?</p>
+
+<h2 style="text-align: left;">Limiting the Scrape Size</h2>
+
+<p style="text-align: left;">Prometheus allows us to limit the maximum scrape size. In case one of the API will send too much metrics and breach this limit, Prometheus will not scrape it. This allows us to protect Prometheus from such cases - exactly what we wanted! It's relatively simple to add this limit - just add <code>scrape_limit</code> to the job definition (you can read more about it <a href="https://www.robustperception.io/using-sample_limit-to-avoid-overload">here</a>).</p>
+
+<p style="text-align: left;">Having a limit is great, but not all namespaces are equal: For example, in namespaces like kube-system or kube-public running cluster components, like Kubernetes API server, kube-state-metrics and other. In these namespaces, we either don't want to limit the scrape (because it's too risky to loose metrics), or we need to set higher thresholds. It was a bit tricky, but with <a href="https://groups.google.com/forum/#!msg/prometheus-users/Y_-eyo9q8b0/7y4PM3_nDgAJ">community help</a> I was able to solve it.</p>
+
+<h2 style="text-align: left;">Monitoring Scrape Size</h2>
+
+<p style="text-align: left;">So now we have alert on scrape duration and we limited the maximum scrape size. Are we good? Well, almost. One final question left: When the limit is breached, Prometheus will stop scraping the target until the API will expose fewer metrics. How can the team that is responsible for this API know? And more important, how they can get an alert before the limit is breached?</p>
+
+<p style="text-align: left;">Alerting on the scrape size is easy by using the <code>scrape_samples_scraped</code> metric. Using this metric, teams can monitor how many data points are exposed by the services they own, using labels like app or kubernetes_namespace. Consider, for example, the following alert definition:</p>
+
+<pre class="wp-block-code"><code>alert: TeamAwesomeScraeSampleSize
+expr: max(scrape_samples_scraped[kubernetes_namespace='awesome']) &gt; 1000
+for: 5m
+labels:
+  severity: high
+annotations:
+  summary: "Oh No! One of our services is exposing too much metrics!"</code></pre>
+
+<p style="text-align: left;">Now team "awesome" will get an alert if one of their services is about to breach the limit. Other interesting metrics to consider:</p>
+
+<ul style="text-align: left;">
+    <li>The <code>up</code> metrics value will be 0 when the limit is breached - take that into consideration if you're using <code>up</code> to monitor service health.</li>
+    <li>The <code>prometheus_target_scrapes_exceeded_sample_limit_total</code> metric return how many targets breached the limit - so this can be used as a generic alert.</li>
+</ul>
+
+<h2 style="text-align: left;">Wrapping Up</h2>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: center;"><a href="https://giphy.com/gifs/ubtech-robot-fitness-9SIAXIrMh4AWBx4GBB">via GIPHY</a></p>
+
+<p style="text-align: left;">To keep Prometheus in Shape, you need to:</p>
+
+<ul style="text-align: left;">
+    <li>Use <code>scrape_duration</code> for monitoring</li>
+    <li>Use <code>scrape_limit</code> to drop problematic targets</li>
+    <li>Use <code>scrape_samples_scraped</code> to monitor the size of metrics exposed by a specific target</li>
+</ul>
+
+<p style="text-align: left;">These are fundamental for keeping a single Prometheus instance healthy while having many different services, owned by different teams, running on our cluster.</p></body></html>

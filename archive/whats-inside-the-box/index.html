@@ -1,0 +1,46 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>What&#x27;s inside the box?</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2019-01-07. Tools and advice may be out of date.</p><h1>What&#x27;s inside the box?</h1><p style="text-align: left;">In the last two weeks, I was working on releasing the first OSS release of <a href="https://github.com/Soluto/kamus">Kamus</a>, a secret management solution for Kubernetes. To release Kamus, I had to publish a few <a href="https://hub.docker.com/r/soluto/kamus">docker images</a> to <a href="https://hub.docker.com/">Docker Hub</a> and the <a href="https://www.npmjs.com/package/@soluto-asurion/kamus-cli">CLI</a> - which is deployed as an <a href="https://www.npmjs.com/">NPM</a> package. This was the first time I had to deal with deploying packages to a repository. Doing this process thought made me thinks a lot about the (in)security of this process, and I want to share these thoughts with you. It's all sums up to one small question - what's inside the box? Do you know what you install when you download a package from a repository?</p>
+
+
+
+First, let's clear up the terms used in this post: There is a package. This package is upload by a maintainer to a repository (NPM, Docker hub, NuGet, PIP etc). The user uses a package manager tool to download the package from the repository and use it.
+
+<h2 style="text-align: left;">Why should we care?</h2>
+
+<p style="text-align: left;">Package repositories become a critical part of the software we build. One vulnerable package could make an entire application vulnerable, which can result in a data breach, denial of service or any other kind of attack (<a href="https://en.wikipedia.org/wiki/Equifax#May%E2%80%93July_2017_data_breach">Equifax breach</a> is a great example). Today, when our code is running in docker container, it just becomes worst: Think about downloading a random VM from the internet and using it to run your production application (yes, I know <a href="https://blog.docker.com/2016/03/containers-are-not-vms/">containers are not VM</a>). This is what we usually do when building containers. And if that's not enough - we use package managers to install software on the personal computer we use (and we just had an example for such an attack with the <a href="https://snyk.io/blog/malicious-code-found-in-npm-package-event-stream">event stream</a> vulnerability).</p>
+
+<p style="text-align: left;">I'm telling all that not to scare you, but to point out how much trust we put on package managers. Tools like Docker hub, NPM, NuGet, PIP, and others, which we all used on a daily basis. How much can we trust these tools? Do they worth our trust? To answer these questions, we need first to define the threats, and what controls we would like to see in place.</p>
+
+<h2 style="text-align: left;">A question of trust</h2>
+
+<p style="text-align: left;">It's all boiled down to one simple question: Can I trust the package I'm downloading from the repository? Can I tell for sure it was published by it's authors? Can I know for sure who are the authors? How can I, as a package maintainer, guarantee the authenticity of my packages? (ok, more than one question, but you get the general idea).</p>
+
+<p style="text-align: left;">And what happens when a CI/CD is involved? Pushing packages manually is an error-prone and time-consuming process. I want to have CI/CD process, without weakening the process of publishing packages. How can I achieve that?</p>
+
+<h2 style="text-align: left;">Possible Controls</h2>
+
+<p style="text-align: left;">I want to offer a few controls I that should exist in a package repository. These are controls that can help mitigate the threats I mentioned before and create a more secure (and trustable) package repositories. Nothing here is new, but for some reason, not all of them are available today - and we should work on fixing that:</p>
+
+<ul style="text-align: left;">
+    <li>Least privilege. Create a user for a CI/CD that has the minimum required permissions, usually only publish. The CI/CD process *should* not run as admin, for example. Apply the same rule for all users that have access to the repository.</li>
+    <li>Short lived tokens. The tokens used for authentication by the CI/CD should have expiration dates. Create tokens that are valid for six months or less if possible.</li>
+    <li>MFA. Enforce MFA for all users log in. Requires the user to re-authenticate before publishing a package.</li>
+    <li>Audit. Have a clear audit log describing all the actions performed, including simple way to export the data. The audit logs should have properties like source ip, authenticated user etc.</li>
+    <li>Verified maintainers. Have a clear way for package maintainers to prove their identity. I, for example, should not have the possibility to publish packages under Microsoft name, under any circumstance.</li>
+    <li>Signed packages. Allow package maintainers to sign their packages.</li>
+</ul>
+
+<h2 style="text-align: left;">Existing controls in NPM and Docker hub</h2>
+
+<p style="text-align: left;">Now that I have a list of controls, let's take a look at what controls are available to use. This could help us estimate how secure these repositories are:</p>
+
+<p style="text-align: left;">[table id=1 /]</p>
+
+<p style="text-align: left;">From the table, it should be clear that NPM is a bit more secure than Docker hub. You can enforce MFA and there is support for tokens. The main downside of NPM is how the MFA is implemented. When I worked on <a href="https://www.npmjs.com/package/@soluto-asurion/kamus-cli">Kamus CLI</a>, I wanted to enforce MFA for all the users. Kamus is a very sensitive product - users need to trust it with their secrets. Unfortunately, as you can see on the table, you must choose between having a CI/CD and enforcing MFA. Currently, you cannot require MFA and have a token that can be used by a CI/CD system (Liran Tal <a href="https://twitter.com/liran_tal/status/939769971189735424">asked for it</a> more than a year ago). Due to the sensitivity of Kamus, it was a very hard choice here - and the final decision was to publish it manually for now. Personally, I hate to choose between security and usability.</p>
+
+<p style="text-align: left;">The lack of short-lived tokens and MFA (yes, I don't think we can say that MFA is supported currently in NPM) is also something that does not makes me happy. The combinations of this with the lack of audit logs is what lead me to loss the trust in this systems. I hope we can see these areas improved in the future - this is critical for all of us.</p>
+
+<h2 style="text-align: left;">Looking forward</h2>
+
+<p style="text-align: left;">In this post, I tried to share an initial list of controls that any package repository should support. I used this list to test NPM and Dockerhub, and the results are disappointing. I need your help for the next steps - to make a real impact. What we can do? One idea is to start a project similar to <a href="https://www.owasp.org/index.php/Category:OWASP_Application_Security_Verification_Standard_Project">OWASP ASVS</a> -what do you think on "package repository verification standard"?. The project should contains a list of controls that each package repository should have. My list is just my list - I'm sure there are controls I missed.</p>
+
+<p style="text-align: left;">Another direction is including more package repositories in the table - what is the status of Nuget? And what about Helm charts? Maybe this list should be part of the same project. Finally, the most important part is communication. Every developer is a costumer of a package repository. We all affected. We all should require from repository owners to build more secure system. There is so much we can do to make this process a bit more secure. Will you join me?</p></body></html>

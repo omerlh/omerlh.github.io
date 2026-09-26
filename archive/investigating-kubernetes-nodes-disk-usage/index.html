@@ -1,0 +1,56 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Investigating Kubernetes Nodes Disk Usage</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2018-12-18. Tools and advice may be out of date.</p><h1>Investigating Kubernetes Nodes Disk Usage</h1><p style="text-align: left;">Today, I looked at our production <a href="https://kubernetes.io/">Kubernetes</a> cluster dashboard and I noticed something weird:</p>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: left;">Well, this looks pretty bad. This is the average disk usage of the nodes running in the cluster. On average, only 20% percent of the disk in each node is available. This is probably not a good sign.</p>
+
+<p style="text-align: left;">What can be the issue? There is probably some big files on the disk, the only question is what. Finding the biggest files on Linux is simple (see <a href="https://www.cyberciti.biz/faq/linux-find-largest-file-in-directory-recursively-using-find-du/">this post</a> for more details). All we need to do is to run the following command:</p>
+
+<pre class="wp-block-code"><code>du -a /dir/ | sort -n -r | head -n 20</code></pre>
+
+<p style="text-align: left;">So, to find out what eats all the space on our nodes, all I need to do is run this command on all the nodes, and find the problematic files. Using SSH to do that is one way, but I'm lazy and don't like to manually connect to each one of the nodes. Let's do it the Kubernetes way!</p>
+
+<h2 style="text-align: left;">Leveraging the power of Daemonset</h2>
+
+<p style="text-align: left;">What I want to do is to run a command on all the nodes in the cluster. The easiest way to achieve that is by using a <a href="https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/">Daemonset</a>. Daemonset is a Kubernetes object that let you run a pod on all (or some) of the nodes in the cluster, which is exactly what I want. What left is writing the pod spec so it will do the following:</p>
+
+<ul style="text-align: left;">
+    <li>Mount the node root file system (<code>/</code>) into the container</li>
+    <li>Run the pod as <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod/#privileged-mode-for-pod-containers">privileged</a> so the container can access all the files from the host (careful here!)</li>
+    <li>Run the command to list the 20th most heavy files in the root file system</li>
+</ul>
+
+<p style="text-align: left;">The full declaration of the daemonset is <a href="https://gist.github.com/omerlh/cc5724ffeea17917eb06843dbff987b7">here</a>. To run it, use the following kubectl command:</p>
+
+<pre class="wp-block-code"><code>kubectl apply -f https://gist.githubusercontent.com/omerlh/cc5724ffeea17917eb06843dbff987b7/raw/1e58c8850aeeb6d22d8061338f09e5e1534ab638/daemonset.yaml </code></pre>
+
+<pre class="wp-block-code"><code></code></pre>
+
+<p style="text-align: left;">And now watch the pods running using the following kubectl command:</p>
+
+<pre class="wp-block-code"><code>kubectl get pods -w -l app=disk-checker</code></pre>
+
+<p style="text-align: left;">You should see an output similar to this, with more pods (depending on the number of the nodes running on your cluster):</p>
+
+<p class="note">[Image not available in the archive]</p>
+
+<p style="text-align: left;">Now it's time to wait - this is going to take some time until the pod will finish going over all the files in the node filesystem. When all the pods are in a complete state, it's time to inspect the logs to find which files are the biggest:</p>
+
+<pre class="wp-block-code"><code>kubectl logs -l app=disk-checker -p</code></pre>
+
+The <code>-p</code> flag is due to daemonset behavior - one the pod will complete, it will be restarted. I want the logs from the previous pod, not the current one. The output should look like this:
+
+<span class="note">[Image not available]</span>
+
+<p style="text-align: left;">Easy, right? Just don't forget to clean up the daemonset when you're done:</p>
+
+<pre><code>kubectl delete daemonset disk-checker
+</code></pre>
+
+<h2 style="text-align: left;">Conclusion</h2>
+
+<p style="text-align: left;">After going over this process, I was able to find out which files were consuming most of the space. The next step was to investigate - why these files take so much space?</p>
+
+<p style="text-align: left;">After discussing the findings with my colleges (thank you Shay Katz and Yaron Idan!), I find out that I was barking up the wrong tree. Look like kubelet start cleaning up images only when disk usage is over 85% percent (see the official documentation <a href="https://kubernetes.io/docs/concepts/cluster-administration/kubelet-garbage-collection/#user-configuration">here</a>). So actually, any disk usage below 85% is normal.</p>
+
+<p style="text-align: left;">To conclude, today I learned how to find out which files consume most space on Kubernetes nodes and also how kubelet image cleaning policy works. But most importantly, I learned that I should always ask "is this a problem", before starting to investigate it.</p></body></html>

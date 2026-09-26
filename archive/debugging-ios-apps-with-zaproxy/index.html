@@ -1,0 +1,109 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Debugging iOS apps with Zaproxy</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2019-05-15. Tools and advice may be out of date.</p><h1>Debugging iOS apps with Zaproxy</h1><p style="text-align: left;">The other day I was debugging a really nasty bug that happens only in our iOS app. I was really frustrated because I couldn't figure out why it happens. Everything looks good when debugging the iOS code, but for some reason - the server failed to deserialize the request body. I freaked out - nothing I tried seems to solve the issue. If only there was an easy way to view the actual request and response, maybe I could understand what the issue was...</p>
+
+<p style="text-align: left;">This is where a proxy comes in handy: A proxy can inspect the traffic and print it an easy to understand manner. There are a lot of available proxies you can use (like <a href="https://www.charlesproxy.com/">Charles</a> (commercial) or <a href="https://www.telerik.com/fiddler">Fidler</a>), but <a href="https://github.com/zaproxy/zaproxy">OWASP Zaproxy</a> (Zap) is the best open source proxy that I know. Let's see how easy it is to set it up:</p>
+
+
+
+<h2 style="text-align: left;">Step 1 - Install Zap's Root CA Certificate</h2>
+
+
+
+
+
+<p style="text-align: left;">Installing the root CA certificate on our iOS device is required in order to allow Zap to inspect HTTPS traffic - by acting as a <a href="https://en.wikipedia.org/wiki/TLS_termination_proxy&quot;">TLS termination proxy</a>. To install it, start by exporting the root CA from Zap. Go to Zap, and click Tools -&gt; Options -&gt; Dynamic SSL Certificates to open this menu:</p>
+
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+
+<p style="text-align: left;">Click the little save button, and choose where to save the certificate. Now it's time to import it - this is a simple as dragging the certificate file and dropping it inside the simulator. Once you drop the certificate, a new Safari window will appear:</p>
+
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+
+<p style="text-align: left;">Press allow - <em>only because you know what is this certificate</em>. Careful before doing something similar on your personal phone, or with a certificate that you're not trusting! Now you should see the following window:</p>
+
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+
+<p style="text-align: left;">Press the install button, and again on the install button in the next window - and we're almost done! Now it's important to activate the certificate - otherwise, it will not be trusted by iOS. Go to Settings -&gt; General -&gt; About -&gt; Certificate Trust Settings:</p>
+
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+
+<p style="text-align: left;">Press the little switch button near "OWASP Zed Attack Proxy Root CA". Doing so will show another dialog box. Press continue - and now you're done! From now, Zap can intercept TLS traffic from an app running on this Simulator 👏🏽 👏🏽</p>
+
+
+
+
+
+<p style="text-align: left;">Before moving to the next step - a quick reminder: If you're app use <a href="https://www.owasp.org/index.php/Certificate_and_Public_Key_Pinning">certificate pinning</a>, the above will not work. Certificate pinning protects your app from someone trying to intercept TLS traffic - and this is why you want it. Make sure to disable it in you're app code before continue reading!</p>
+
+
+
+
+
+<h2 style="text-align: left;">Step 2 - Configure Proxy Settings</h2>
+
+
+
+
+
+<p style="text-align: left;">The next step is to configure iOS simulator to use Zap as a proxy for all outgoing requests. As iOS simulator uses the OS proxy settings, this is done by changing them. Open System Preferences -&gt; Network and choose your active network connection (e.g. Wifi). Click the advance button and go to proxies tab:</p>
+
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+
+<p style="text-align: left;">Make sure you check both Web Proxy and Secure Web Proxy and set the correct details of Zap on both of them. If Zap is running on your local machine - the settings in the picture should work. Now press the "ok" button and "apply" on the main network settings and you're done!</p>
+
+
+
+
+
+<h2 style="text-align: left;">Step 3 - Profit!</h2>
+
+
+
+
+
+<p style="text-align: left;">It's time for the fun part! Open any app on the simulator - and you should see the requests on Zap proxy. For example, this is what I see on Zap when I try to open my blog using Safari browser on the simulator:</p>
+
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+
+<p style="text-align: left;">You can easily see all the requests and response nicely printed. Zap support advanced features like replaying the request. This is useful if you want to take the product request and send it to a service running locally. Check out the context menu on the request to see everything Zap can do. One last bonus point: because we're using Zaproxy - we also get a free security test for our app. Make sure to take a look at the alert tab - you might discover a security issue in you're app!</p>
+
+<h2>Wrapping up - finding the bug!</h2>
+
+After I proxied the requests from my app, I spotted the bug immediately: For some reason, our iOS app uses <a href="https://en.wikipedia.org/wiki/Camel_case">camel case</a> when serializing while all the other clients use <a href="http://wiki.c2.com/?PascalCase">Pascal case</a> for serializing 🤦🏽‍♀️It was a lot harder to spot this bug without a proxy!
+
+<span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;">Credit: This post is inspired by this </span><a style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;" href="https://diego.org/2018/06/29/charles-proxy-on-ios-simulator/">great post</a><span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;"> showing how to configure Charles proxy for iOS simulator. The post helped me understand how to import the certificate but requires some modification to work also with Zaproxy. Thank you for the help!</span></body></html>

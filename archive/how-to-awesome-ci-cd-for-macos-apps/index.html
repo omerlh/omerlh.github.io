@@ -1,0 +1,328 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>How To: Awesome CI / CD for macOS apps</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2022-03-11. Tools and advice may be out of date.</p><h1>How To: Awesome CI / CD for macOS apps</h1>In the past week, I was working on building a small utility macOS application. It was pretty fun - Swift is a really nice language. One of the challenges was setting up a CI / CD pipeline: I wanted to create an app everyone could download and use after each commit, automatically. It requires a lot of digging and googling, so I wanted to share what I did - in case you'll encounter a similar problem...
+
+
+
+
+
+
+
+
+<h2>Releasing macOS applications</h2>
+
+
+
+
+The first challenge was - what do I even release? When building macOS apps, you have a couple of export options (pretty similar to iOS). You could upload it to the app store (after signing the app) or you could just generate a <code>.app</code> file and share it with everyone. <br>I've decided to go with the second option, just because it was simpler and didn't require creating a developer account (which costs money...). <br>Xcode has a cli tool, <code>xcodebuild</code> which can be used in CI to build, test, and export the app in the desired format. While this works, it's a bit tricky to configure. So, to skip a lot of pain, it's a lot easier to use <a href="https://docs.fastlane.tools/" target="_blank" rel="noreferrer noopener">Fastlane</a>. Fastlane is a tool for building CI/CD pipelines (or "Lanes") for iOS, Android, and macOS applications.
+
+
+
+
+<h2>Building with Fastlane</h2>
+
+
+
+
+Fastlane can build macOS applications for us, with very few lines (see the <a href="https://docs.fastlane.tools/actions/build_mac_app/" target="_blank" rel="noreferrer noopener">docs</a> for more details). All that is needed is simple <code>Fastfile</code> (in the <code>fastlane</code> folder) with the following content:
+
+
+
+
+<pre class="wp-block-code"><code>lane :release do
+  gym(scheme: "&lt;your schema&gt;")
+end</code></pre>
+
+
+
+
+And you're done! Now if you'll run <code>fastlane release</code> it will build and export an <code>.app</code> file for you. Easy, right? <br>Adding a CI is also simple with <a href="https://github.com/features/actions" target="_blank" rel="noreferrer noopener">Github Actions</a>. Create a new file <code>macos-build.yml</code> under <code>.github/wrokflows</code> folder with the following content:
+
+
+
+
+<pre class="wp-block-code"><code>name: Fastlane Workflow
+
+on:
+  push:
+    branches: &#91; main ]
+concurrency: 
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    name: Release MacOS app with Fastlane
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+       - uses: ruby/setup-ruby@v1
+         with:
+          ruby-version: '2.7.2'
+       - uses: maierj/fastlane-action@v2.2.0
+         with:
+          lane: 'release'</code></pre>
+
+
+
+
+Commit and push the changes - and now you have a CI / CD pipeline: Each time a code is pushed to the main branch, Github action will build and export the app for you. While this is nice, it is not enough. Let's add some more good stuff to make our life easier.
+
+
+
+
+<h2>Automatic versioning using Semantic Release</h2>
+
+
+
+
+<a href="https://github.com/semantic-release/semantic-release" target="_blank" rel="noreferrer noopener">Semantic Release</a> is a tool that analyzes the commits to decide how to increase the version. It is using well-known conventions - for example, the <code>fix</code> prefix indicates a bug fix, so it will increase the patch part of the version.  The <code>feat</code> prefix indicates a feature so it will increase the minor part of the version. See the <a href="https://github.com/semantic-release/semantic-release" target="_blank" rel="noreferrer noopener">doc</a> for more details.
+
+
+
+Fastlane has a lot of <a href="https://docs.fastlane.tools/plugins/available-plugins/" target="_blank" rel="noreferrer noopener">plugins</a>, and it has <a href="https://github.com/xotahal/fastlane-plugin-semantic_release" target="_blank" rel="noreferrer noopener">one</a> for semantic releases. This plugin introduces 2 new actions - one for analyzing the release and getting the new version, and one for generating release notes. Let's update our <code>Fastfile</code> to use them:
+
+
+
+
+<pre class="wp-block-code"><code>lane :release do
+  isReleasable = analyze_commits(match: '*')
+  tag = "v#{lane_context&#91;SharedValues::RELEASE_NEXT_VERSION]}"
+  gym(scheme: "workstation-statusbar")
+end</code></pre>
+
+
+
+
+The <code>match: '*'</code> is used to select tags - the tool will look for the latest tag matching, and used it as the base version. Then, based on commits since this tag, it will calculate the next version and put it in the shared context - <code>lane_context[SharedValues::RELEASE_NEXT_VERSION].<br></code>The <code>isReleaseable</code> is the results - not all commits justify a release. A special kind of commit, starting with chore indicating changes to the build system, will not change the version or trigger a release.<br>So we have a version and release note, let's do something with them!
+
+
+
+
+<h2>Creating a release</h2>
+
+
+
+
+I am using Github, so the easiest way to release the software is by creating a new <a href="https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository" target="_blank" rel="noreferrer noopener">Release</a> in the repository. Fastlane has built-in <a href="https://docs.fastlane.tools/actions/set_github_release/" target="_blank" rel="noreferrer noopener">action</a> for creating new releases, and using it is really simple. Let's add the following to our <code>Fastfile</code>:
+
+
+
+
+<pre class="wp-block-code"><code>  if isReleasable 
+    add_git_tag(
+      tag: tag
+    )   
+    push_to_git_remote
+    notes = conventional_changelog(format: 'markdown', 
+      title: '&lt;doesn't matter&gt;', 
+      display_title: false, 
+      commit_url: 'https://github.com/&lt;the org&gt;/&lt;the repository&gt;/commit')
+    set_github_release(
+      repository_name: "&lt;the org&gt;/&lt;the repository&gt;",
+      api_bearer: ENV&#91;"GITHUB_TOKEN"],
+      name: "Release #{lane_context&#91;SharedValues::RELEASE_NEXT_VERSION]}",
+      tag_name: tag,
+      description: notes,
+      commitish: "main",
+      upload_assets: &#91;"&lt;scheme&gt;.app", "&lt;scheme&gt;.app.dSYM.zip"]
+    )
+  else 
+    print("Not release candiate, do nothing")
+  end</code></pre>
+
+
+
+
+<code> </code>Ok, this is a lot :) Let's break it down, line by line:<br>The first 3 lines call the built-in function <code>add_git_tag</code> to create a new tag using the <code>tag</code> variable - the one with the next version to release.<br>After creating the tag, we need to push it to the remote git server (Github) using <code>push_to_git_remote</code>. <br>We can use another function to generate the release notes - <code>conventional_changelog</code>. This function comes from the semantic versioning plugin. It gets some parameters like the format (We want markdown so it will look pretty in Github) and a way to create a link to the original commit. I've chosen to hide the title because Github adds one automatically.<br>After completing all the preparations, we can actually create the release using <code>set_github_release</code>. You can see that I'm passing in the <code>notes</code> and <code>tags</code> we created using the semantic release tool. The last thing is the assets - the files that the users could download from the release. The result is really beautiful:
+
+
+
+<p class="note">[Image not available in the archive]</p>
+
+
+
+The last thing we need to do is pass <code>ENV["GITHUB_TOKEN"]</code> to Fastlane so it could authenticate to Github. Github actions <a href="https://docs.github.com/en/actions/security-guides/automatic-token-authentication" target="_blank" rel="noreferrer noopener">automatically create a token</a> that we can use for this, so we just need to modify how we call Fastlane and use this token:
+
+
+
+
+<pre class="wp-block-code"><code>     - uses: maierj/fastlane-action@v2.2.0
+        with:
+          lane: 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}</code></pre>
+
+
+
+
+
+<h2>Showing the version to our users</h2>
+
+
+
+
+Now that we have a version, it will be nice to show it somewhere in the application - for example, on the about screen. It will allow users to know which version they are using - either to report a bug or to check if they are using the latest version.<br>If you google how to set the version and use it, a lot of docs will point you to <code>agvtool</code> and <code>CFBundleShortVersionString</code>. Fastlane even has a built-in <a href="https://docs.fastlane.tools/actions/increment_version_number/" target="_blank" rel="noreferrer noopener">action</a> for that. It seems nice, but apparently, if you're using XCode 11 or later this will not work. Apple changed how they do versioning and it is no longer stored in <code>Info.plist</code>.<br>To set the version we'll use another <a href="https://github.com/SiarheiFedartsou/fastlane-plugin-versioning" target="_blank" rel="noreferrer noopener">plugin</a> that can set the version in the project properly. Using it is very simple:
+
+
+
+
+<pre class="wp-block-code"><code>  increment_version_number_in_xcodeproj(
+    version_number: lane_context&#91;SharedValues::RELEASE_NEXT_VERSION] # Automatically increment minor version number
+  )</code></pre>
+
+
+
+
+This will set the value from semantic release in the code, and we could use <code>CFBundleShortVersionString</code> it to show the version to our users:
+
+
+
+
+<pre class="wp-block-code"><code>if let text = Bundle.main.infoDictionary?&#91;"CFBundleShortVersionString"] as? String {
+            //do something with the versio
+        }</code></pre>
+
+
+
+
+Are we done? Almost!<br>
+
+
+
+
+<h2>Creating an "Installer"</h2>
+
+
+
+
+If you ever installed an app on your Mac, you're familiar with how the "Installer" looks: a <code>dmg</code> file, that when clicking on it will help you copy the app to the <code>Application</code> folder. I wanted to create something similar to package my app. There are a lot of tools out there for creating a <code>.dmg</code> from <code>.app</code> file, including a Fastlane <a href="https://github.com/advoryanskiy/fastlane-plugin-dmg" target="_blank" rel="noreferrer noopener">plugin</a>. While they work, they are not the same - the Fastlane plugin, for example, creates <code>dmg</code> without the "Installer" experience. <br>There is another NodeJS tool that can create lovely <code>.dmg</code> called <a href="https://github.com/sindresorhus/create-dmg" target="_blank" rel="noreferrer noopener">create-dmg</a>. Using it from Fastlane is really easy:
+
+
+
+
+<pre class="wp-block-code"><code>sh "npx create-dmg ../workstation-statusbar.app", log: true, error_callback: -&gt;(result) { 
+    error_occurred = false
+  }</code></pre>
+
+
+
+
+I had to add the <code>error_callback</code> because the tool will show errors if you will not provide signing keys to sign the dmg - but will create it. This tells Fastlane to ignore the non-zero exit code and continue with the rest of the lane.<br>Now that we have a beautiful <code>.dmg</code> "installer", let's upload it to the release by changing the release action to this:
+
+
+
+
+<pre class="wp-block-code"><code> set_github_release(
+      repository_name: "snyk/workstation-statusbar",
+      api_bearer: ENV&#91;"GITHUB_TOKEN"],
+      name: "Release #{lane_context&#91;SharedValues::RELEASE_NEXT_VERSION]}",
+      tag_name: tag,
+      description: notes,
+      commitish: "main",
+      upload_assets: &#91;"fastlane/&lt;scheme&gt; #{lane_context&#91;SharedValues::RELEASE_NEXT_VERSION]}.dmg", "workstation-statusbar.app.dSYM.zip"]
+    )</code></pre>
+
+
+
+
+We are almost done, we have one final and very important stage: Debug Symbols!
+
+
+
+
+<h2>Uploading Debug Symbols</h2>
+
+
+
+
+
+<div class="wp-block-image"><p class="note">[Image not available in the archive]</p></div>
+
+
+
+
+Every code we write can have bugs. It might even crash in certain situations. When this happens to a server, we can view the logs or inspect the container to debug it. When it happens to a user on their machine, debugging is a bit more tricky. It is even harder for a compiled code - you need to translate the compiled code to the original Swift code so you could see where the error is thrown and try to fix it. This process is called "symbolication" and the translation is possible using a translation file called "symbols" that the compiler produces as part of the compilation process (see <a href="https://stackoverflow.com/a/22460268" target="_blank" rel="noreferrer noopener">this</a> Stack Overflow answer for more details).<br>If you wonder what is the magical <code>dSYM</code> file that we upload to the release with the app - these are the symbols created by the compiler. Having them stored with the release allows us to quickly find them and use them when we want to symbolicate a crash report (see this <strong><a href="https://developer.apple.com/documentation/xcode/adding-identifiable-symbol-names-to-a-crash-report" target="_blank" rel="noreferrer noopener">guide</a></strong> to learn how).
+
+
+
+While this is working and allows us to easily inspect crashes, it is a painful process. There are modern tools for crash monitoring and analysis like <a href="https://firebase.google.com/products/crashlytics" target="_blank" rel="noreferrer noopener">Firebase Crashlytics</a> or <a href="https://sentry.io/welcome/" target="_blank" rel="noreferrer noopener">Sentry</a>. As part of the CI process we will upload the symbol files, and then the tool can use it to symbolicate the crash for us and just tell us when it happend.
+
+
+
+I've choosed to go with Sentry, which (of course!) has <a href="https://docs.sentry.io/platforms/apple/dsym/" target="_blank" rel="noreferrer noopener">Fastlane plugin</a> for uploading the symbols files, and is really simple to use:
+
+
+
+
+<pre class="wp-block-code"><code>    ENV&#91;"XCODE_VERSION_ACTUAL"] = "6"
+    ENV&#91;"CURRENT_PROJECT_VERSION"] = "5"
+    ENV&#91;"MARKETING_VERSION"] = lane_context&#91;SharedValues::RELEASE_NEXT_VERSION]
+    ENV&#91;"PRODUCT_BUNDLE_IDENTIFIER"] = "&lt;scheme&gt;"
+    ENV&#91;"PRODUCT_NAME"] = "&lt;scheme&gt;"
+
+    sentry_upload_dsym(
+      auth_token: ENV&#91;"SENTRY_TOKEN"],
+      org_slug: '&lt;org name in Sentry&gt;',
+      project_slug: '&lt;project name in Sentry&gt;',
+      dsym_path: "&lt;scheme&gt;.app.dSYM.zip"
+    )</code></pre>
+
+
+
+
+You're probably wonder what are those magical environment variable. If you recall, XCode changed where the version information is stored (see the version part of this articale for more details). Sentry cli by default try to use the old method - by looking for non-existing <code>Info.plist</code> file. The CLI can also use the new method - if it "thinks" it is running inside XCode (which I've leraned by reading the <a href="https://github.com/getsentry/sentry-cli/blob/master/src/utils/xcode.rs" target="_blank" rel="noreferrer noopener">code</a>). This is a known issues, and there is another <a href="https://github.com/getsentry/sentry-cli/issues/1093" target="_blank" rel="noreferrer noopener">official workaround</a> for getting the <code>Info.plist</code> back. I've prefered to go with the native XCode solution instead.<br>As you'll see - we need another variable to authenticate to Sentry. Follow the <a href="https://docs.sentry.io/product/cli/dif/#permissions" target="_blank" rel="noreferrer noopener">documentation</a> to create a token with the correct permissions and put it in <a href="https://docs.github.com/en/actions/security-guides/encrypted-secrets" target="_blank" rel="noreferrer noopener">Github Secrets</a> in the repository. Now update the workflow to look like the following:
+
+
+
+
+<pre class="wp-block-code"><code>steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '2.7.2'
+      - name: Install Sentry CLI
+        run: curl -sL https://sentry.io/get-cli/ | bash
+
+      - uses: maierj/fastlane-action@v2.2.0
+        with:
+          lane: 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_TOKEN: ${{ secrets.SENTRY_TOKEN }}</code></pre>
+
+
+
+
+As you can see, we added the <code>SENTRY_TOKEN</code> and reading it from the secrets. Another addition is the installation of Sentry CLI and setting Node - which is required for the previous step - the DMG creation.<br>The last step is to actually use Sentry SDK - follow the <a href="https://docs.sentry.io/platforms/apple/guides/macos/" target="_blank" rel="noreferrer noopener">docs</a> for details on how to do so. After doing that, every error or crash will be sent to Sentry, and using the symbols Sentry could symbolicate the crash and show us where it happened. NICE!
+
+
+
+
+<h2>Wrapping Up</h2>
+
+
+
+
+Wow, that was a LONG journey. Let's recap what our pipeline does:
+
+
+
+
+<ul><li>Calculating the version using semantic release</li><li>Compiling and creating a <code>.app</code> files and symbols</li><li>Creating a beutiful <code>.dmg</code> "installer"</li><li>Uploading symbols to Sentry</li><li>Creating a release with automatic, lovely, release notes</li></ul>
+
+
+
+
+For me, this is good enough :) Something very important is missing here - tests! I didn't wrote tests yet (shame!) but running them with <a href="https://docs.fastlane.tools/getting-started/ios/running-tests/" target="_blank" rel="noreferrer noopener">Fastlane</a> is easy.
+
+
+
+That's it for today - let me know if you find it helpful - or if you enoucnter any issues. I'll be happy to try and help you out!</body></html>

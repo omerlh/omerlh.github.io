@@ -1,0 +1,158 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>How To Build Go &amp; C Code for Windows using Github Actions</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2022-02-25. Tools and advice may be out of date.</p><h1>How To Build Go &amp; C Code for Windows using Github Actions</h1>A few weeks ago, a friend of mine needed a small program that accepts data in a CSV format and produces some reports. The code itself was very simple - I've chosen Go because I wanted to produce an executable that could run on any machine. No runtime dependencies are required.<br>The fun part started when he asked to generate the PDF reports. I've found a good C library, <a href="https://wkhtmltopdf.org/" target="_blank" rel="noreferrer noopener">wkhtmltopdf</a>, and a Go bindings <a href="https://github.com/adrg/go-wkhtmltopdf" target="_blank" rel="noreferrer noopener">library</a>. I got it working and was able to produce PDF files on my Mac machines pretty fast. The problem: My friend needed a Windows binary! How can I set up a CI/CD pipeline to build the executable with support for the native C library? This is the story I am planning to tell today. If you're just interested in the TL;DR, you can just check the <a href="https://github.com/omerlh/wizo-scheduler/blob/main/.github/workflows/go.yml" target="_blank" rel="noreferrer noopener">workflow</a> file on Github. <br>So, without further ado, let's begin!
+
+
+
+
+
+
+
+
+<h2>Building Go Native Module</h2>
+
+
+
+
+The Go library is just bindings for the native C code. Go has pretty <a href="https://pkg.go.dev/cmd/cgo" target="_blank" rel="noreferrer noopener">good support</a> for calling C libraries from Go. But, in order to compile my code, I must have wkhtmltopdf library installed on my machine. For Mac, it's fairly simple - a <a href="https://formulae.brew.sh/cask/wkhtmltopdf" target="_blank" rel="noreferrer noopener">brew formulae</a> exist, so after I've installed it the code compiled without any issues. But what about the CI?<br>I've already had a CI that generates Windows executable. One of the cool things about Go is the ability to generate an executable for any operating system and any architecture, no matter which machine you have. So I just used a regular Linux runner in <a href="https://docs.github.com/en/actions" target="_blank" rel="noreferrer noopener">Github Actions</a> and set the required operating system and architecture:
+
+
+
+
+<pre class="wp-block-code"><code>GOOS=windows GOARCH=amd64 go build</code></pre>
+
+
+
+
+While this worked flawlessly, to support native C modules I had to do something different...
+
+
+
+
+<h2>Hello Windows Server</h2>
+
+
+
+
+So to build native modules we are going to use a Windows machine to compile and produce Windows executable. Github actions make it really simple to run code on a Windows machine - this is all that is required:
+
+
+
+
+<pre class="wp-block-code"><code>runs-on: windows-latest</code></pre>
+
+
+
+
+And from now, the build will run on a Windows server machine. <br>Ok, we have the right machine. What now? To build the code, we need to install the native wkhtmltopdf library. If you, like me, use mainly Linux / Mac in your day-to-day life, this is pretty confusing: How do I install stuff? Where is my <code>apt / apk / brew</code> ?? <br>It took me some Googling but I was able to find a solution - <a href="https://chocolatey.org/" target="_blank" rel="noreferrer noopener">Chocolatey</a>, the (yummier) package manager for Windows. Installing wkhtmltopdf is as simple as running (with some flags for cleaner output):
+
+
+
+
+<pre class="wp-block-code"><code>choco install --limit-output --no-progress wkhtmltopdf</code></pre>
+
+
+
+
+Easy, right? Now, all we need is to actually build the code!
+
+
+
+
+<h2>It's build time!</h2>
+
+
+
+
+The Go binding library has <a href="https://github.com/adrg/go-wkhtmltopdf/wiki/Install-on-Windows" target="_blank" rel="noreferrer noopener">instructions</a> for installing on Windows. It is not enough to install the library - we need to tell the Go compiler where we installed it by setting the relevant environment variables:
+
+
+
+
+<pre class="wp-block-code"><code>set CGO_LDFLAGS=-L{your-sdk-path}\bin
+set CGO_CFLAGS=-I{your-sdk-path}\include</code></pre>
+
+
+
+
+Chocolatey install the library to <code>C:\Program Files\wkhtmltopdf</code>, so I've tried to set those environment variables and build my code. And of course, it <a href="https://github.com/omerlh/wizo-scheduler/runs/5032817440?check_suite_focus=true" target="_blank" rel="noreferrer noopener">failed</a>:
+
+
+
+
+<pre class="wp-block-code"><code>Error: C:\Users\runneradmin\go\pkg\mod\github.com\adrg\go-wkhtmltopdf@v0.3.0\converter.go:7:10: fatal error: wkhtmltox/pdf.h: No such file or directory
+ #include &lt;wkhtmltox/pdf.h&gt;
+          ^~~~~~~~~~~~~~~~~</code></pre>
+
+
+
+
+
+<div class="wp-block-image"><p class="note">[Image not available in the archive]</p></div>
+
+
+
+
+The error is clear - the compiler did not find the native library. But why? I did everything correctly... It took me a while to figure it out, but at some point, I've noticed this line at the beginning of the log:
+
+
+
+
+<pre class="wp-block-code"><code>  shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"</code></pre>
+
+
+
+
+And this is when it hit me: This is not a regular command prompt, this is <a href="https://docs.microsoft.com/en-us/powershell/" target="_blank" rel="noreferrer noopener">PowerShell</a>! PowerShell is the new(ish) shiny successor of the command prompt, and it does not always behave the same.
+
+
+
+
+<h2>PowerShell??</h2>
+
+
+
+
+Setting environment variables PowerShell has a different syntax (see the <a href="https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/set-item?view=powershell-7.2" target="_blank" rel="noreferrer noopener">docs</a> for more details):
+
+
+
+
+<pre class="wp-block-code"><code>Set-Item -Path Env:CGO_LDFLAGS -Value "-LC:\Program Files\wkhtmltopdf\bin"
+Set-Item -Path Env:CGO_CFLAGS -Value "C:\Program Files\wkhtmltopdfIC:\wkhtmltopdf\include"</code></pre>
+
+
+
+
+If we try to <a href="https://github.com/omerlh/wizo-scheduler/runs/5032867599?check_suite_focus=true" target="_blank" rel="noreferrer noopener">run</a> it, this time we will find a new and different error (which is always better!):
+
+
+
+
+<pre class="wp-block-code"><code># runtime/cgo
+gcc.exe: error: Files\wkhtmltopdf\include: No such file or directory
+# runtime/cgo
+gcc.exe: error: Files\wkhtmltopdf\include: No such file or directory</code></pre>
+
+
+
+
+So the compile now has the right environment variables, but it is looking in the wrong place. What happened now? <br>The Go compiler does not support folders with spaces - which is a known <a href="https://github.com/golang/go/issues/45637" target="_blank" rel="noreferrer noopener">bug</a>, as I've found out the hard way. I couldn't find how to change the installation folder using Chocolatey, so I've decided to solve it by creating a <a href="https://en.wikipedia.org/wiki/Symbolic_link" target="_blank" rel="noreferrer noopener">symbolic link</a>. This is fairly trivial with PowerShell:
+
+
+
+
+<pre class="wp-block-code"><code>New-Item -ItemType Junction -Path "C:\wkhtmltopdf" -Target "C:\Program Files\wkhtmltopdf"</code></pre>
+
+
+
+
+All I need to do now is update the compiler environment variables to point to the new folder, and this time it will <a href="https://github.com/omerlh/wizo-scheduler/runs/5033676487?check_suite_focus=true" target="_blank" rel="noreferrer noopener">compile</a>!
+
+
+
+
+<h2>Wrapping Up</h2>
+
+
+
+
+This was a fun journey, at least for me. I had to deal with some non-trivial surprises in the way, and I couldn't find good documentation showing the way. So I've decided to share my journey - in the hope that if you had to do something similar, it will be easier for you. <br>Happy Building! If you did find my post helpful, do tell - what worked for you? What didn't?</body></html>

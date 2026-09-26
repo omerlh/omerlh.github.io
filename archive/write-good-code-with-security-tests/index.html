@@ -1,0 +1,144 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Want to Write Good Code? Start Using Security Tests</title><link rel="stylesheet" href="../../style.css"></head><body><nav><a href="../../index.html">Home</a><a href="../../archive/index.html">Archive</a></nav><p class='note'>Archived post, originally published 2018-10-04. Tools and advice may be out of date.</p><h1>Want to Write Good Code? Start Using Security Tests</h1>I like to write code. I'm doing it a lot, both professionally and for fun. Still, writing a good code is a challenge. Writing a code that is working, maintainable and secure is very hard to achieve. This is why we need automation - to spot the issues we missed. Tools like unit tests, code coverage or security tests can help detect various issues and help us write a better code.
+
+Let's take an example. I've created a <a href="https://github.com/omerlh/container-security-testing">small sample app</a> using .NET core, my favorite language. I also created one container so we have something to play with.
+
+Now it's time to ask - does this code has security issues? Can I publish it to production?
+
+You can try to answer this question by reading the code, or read along and learn what tools you can start using today to spot these issues.<span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;">Two quick notes before we start:</span>
+
+First, In case your thinking that this post is only for .NET core developers - this is not true. I'm going to discuss what kind of tests we can use, no matter which language or platform is used. Most of the tools I'll discuss here are generics - and where this is not the case, I'll also share what other tools exist out there.
+
+Second, you can play with each one of the tools that are mentioned in the post. All of them tested using the <a href="https://github.com/omerlh/container-security-testing">sample app</a>. The readme contains all the information that is required to run them. This is an interactive post - don't just read about a tool, go ahead and play with it. Feel the value it can give you.
+
+<h2>Our Journey's Map</h2>
+
+In this post, I'm going to cover five types of security tests. You can either read this post from start to end or jump to the part that seems the most interesting to you. The types are:
+
+<ul>
+    <li><a href="#static">Code Scanning - Static Analysis</a></li>
+    <li><a href="#dynamic">Code Scanning - Dynamic Analysis</a></li>
+    <li><a href="#packages">Packages Scanning</a></li>
+    <li><a href="#docker">Docker Image Scanning</a></li>
+    <li><a href="http://k8s">Kubernetes Deployment Files Scanning</a></li>
+</ul>
+
+And now, without any further introductions, it's time to actually start!
+
+<h2 id="code">Code Scanning</h2>
+
+The first thing I want to automate is code review. Just by reading a code, a lot of security issues can be spotted. The only problem - manual code review is expensive and requires a person with dedicated skills. Let's see how much we can automate this process.
+
+<h3 id="static">Static Analysis</h3>
+
+One way to automate code review is by using a Static Analysis tool. This is a tool that scans static assets (mainly code, but other assets like configuration files) for various security issues. It is a really powerful tool when used correctly, and can provide high value to the user. This tool becomes even more powerful when combined with the IDE - here is one example using<a href="https://github.com/Microsoft/DevSkim">DevSkim</a>:
+
+<span class="note">[Video not available]</span>
+
+I can see the static analysis warning right in my IDE while I'm writing the code, even before I committed it. Fixing a bug in this stage is a lot faster than fixing it after the code is pushed. DevSkim does a great job: First, it gives you a detailed output - what the issue is and how to fix it. Second, it can fix the issue for you. Writing a secure code was never easier. Want to see it live? <a href="https://github.com/omerlh/container-security-testing#static-analysis">Here</a> is the relevant part of the readme.
+
+IDE integration is important, but not enough. It is very hard (actually, almost impossible) to force developers to use a specific extension, not to mention forcing them to use a specific IDE. Using DevSkim in the IDE should not be your only protection - you should also run it as part of your CI/CD pipeline. This is how you make sure that even if a developer was not using DevSkim in the IDE, she still get the same warnings - after the build on the CI/CD will run. DevSkim has also command line version which can be used on the CI/CD pipeline - you can find more about it <a href="https://github.com/Microsoft/DevSkim/wiki/Analyze-Command">here</a>.
+
+<h3>Customizing the Rules</h3>
+
+The whole power of static analysis comes from its rules engine - the rules define what to look for in the code. When choosing a static analysis tool, it worth looking also at its rules engine - you want a tool that makes it easy for every developer in your company to customize the rules. The most critical things are audit (how to know when a rule was changed) and testability (how can I make sure my rule is working). DevSkim is a doing a great job also here - the rules are on <a href="https://github.com/Microsoft/DevSkim/tree/master/rules/default/security">GitHub</a>, and each rule has it's own tests.
+
+Customizing the rules is what let you build the rules that are specific for the task your working on - pretty similar to writing unit tests. It let you the ability to get the most out of this tool - by customizing it to your needs. Make sure to check the rules engine before choosing a static analysis tool.
+
+So, how do you get started with static analysis? OWASP maintains a <a href="https://www.owasp.org/index.php/Source_Code_Analysis_Tools">list</a> of free and open source tools, so you can just go over the list, find a tool for the language you're using and play with it. Of course, there are also commercial tools, like <a href="https://www.checkmarx.com/">Checkmarx</a>, that you can use in case you can afford the license.
+
+<h3>Dynamic Analysis</h3>
+
+Static analysis is a great tool, but it has one big downside - it is highly coupled with a specific language. Once you start using a new language, you'll have to make sure it supported by this tool - or find a new one.
+
+Dynamic analysis, on the other hand, is not coupled to a specific language. Instead of scanning static assets, it focuses on dynamic assets that are generated from a live application. For example, a web application that uses HTTP protocol generates a specific response for each request. These request and response can be scanned for security issues - similar to scanning the code in static analysis. Another option is to send malicious requests to a web application, to make sure it can handle them and block the attack.
+
+This what makes dynamic analysis so powerful - it is coupled with how the application is working, not with how it is implemented. So, for example, as long as all your APIs are using HTTP protocol - you can use the same dynamic analysis tool. Changing a language (or a stack) happens a lot, changing a protocol is rare (and has other implications).
+
+So, what can be used for dynamic analysis? I like to use <a href="https://github.com/zaproxy/zaproxy">OWASP Zaproxy</a>, a security tool by OWASP. In short, Zap can be used to proxy the requests and responses to your app, and look for security issues (to find more, check out my <a href="https://blog.solutotlv.com/dynamic-security-testing-made-easy/?utm_source=omerlh">blog post</a>. After scanning the app with Zap, you can view the generated report:
+
+<span class="note">[Image not available]</span>
+
+What I like the most about Zap is how informative this tool is. You have a nice output, showing where the issue is (URL+method), what the issue is (description) and most of the times also a potential solution (solution). It makes the work of fixing this issue a lot easier. Please notice that dynamic analysis could only point on an issue, not where the issue is. If a static analysis tool was able to point the specific line of code with the issue - dynamic analysis tool can't. To run it locally, check out this <a href="https://github.com/omerlh/container-security-testing#dynamic-analysis">part</a> of the readme.
+
+One last word about rules engine. Extending Zap with new rules is really simple (you can read about it in my post <a href="https://medium.com/@omerlh/how-to-scripting-owasp-zap-with-javascript-1c1898b1e7e0">here</a>). The rules are written in JavaScript, testable and committed to source control - which gives a great experience for a developer.
+
+So, how do you get started? There is a <a href="https://github.com/Soluto/owasp-zap-glue-ci-images">step-by-step guide</a> I wrote that document the entire process. Follow the guide, and feel free to reach out if you encounter any issue during the process.
+
+<h2 id="packages">Packages Scan</h2>
+
+Scanning the code is important, but what about the packages our code is using? After all, we all love to use packages. Using a package let us use a code that someone else writes seamlessly, and complete the task we're working on faster. Packages also introduce a security issue - this is a code that someone else writes - it might contain a vulnerability. Or even worse - it might contain a vulnerability that everyone else besides me knowing about. Such a vulnerability can be exploited by hackers (and if you don't believe me, ask <a href="https://www.zdnet.com/article/equifax-confirms-apache-struts-flaw-it-failed-to-patch-was-to-blame-for-data-breach/">Equifax</a>). Actually, this issue is now part of the OWASP Top 10 - <a href="https://www.owasp.org/index.php/Top_10-2017_A9-Using_Components_with_Known_Vulnerabilities">A9 Using Componentes With Known Vulnerabilities</a>.
+
+What can you do? Stop using a package is not a practical advice (and might be even worse). A more practical advice is using packages carefully - by using a tool that scans your packages for known vulnerabilities. The tools need to perform two things: (a) building a list of all the dependencies (including transitive dependencies) and (b) checking these dependencies for known vulnerabilities.
+
+The first part (building a list of all the dependencies) is relatively simple. The only tricky part is dependency version locking - without locking the specific version of each package (including transitive dependencies), there is no way to build this list correctly. Unfortunately, not all languages support locking (for example, .NET package manager, NuGet, does not support it yet). If you're using such a language, make sure to scan the packages used by the production deployment, where possible.
+
+The second part (checking for known vulnerabilities) is a challenge - because there is no one good source for known vulnerabilities (you can read more about it on this <a href="https://snyk.io/blog/whats-a-known-vulnerability">post</a>. Also, take a look at <a href="https://snyk.io/stateofossecurity/#discovering-vulnerabilities">Snyk's State of Open Source</a> - especially the part on how maintainers disclose vulnerabilities). This is why different tools will provide different results - which makes the task of choosing a tool a lot harder. Each tool uses different sources, which could impact significantly on the quality of the scan.
+
+Under open source tools, the most impressive tool is <a href="https://dependencytrack.org/">OWASP Dependency Track</a>. However, it does not perform well for .NET (the team helped me a lot with testing it using dotnet core, but we couldn't make it detect any vulnerable library. This should be improved in the future). An alternative for .NET is to use <a href="https://github.com/RetireNet/dotnet-retire">Retire.Net</a>. This tool can be used to scan .NET core dependencies for known vulnerabilities. This how it's output looks like:
+
+<span class="note">[Image not available]</span>
+
+You can see the vulnerable library, and how it was introduced. To fix the issue, you need to find the first non-vulnerable version of the same package and upgrade (fix the upgrade issues). Not a simple process in some cases. It worth noting that other tools provide a more informative output, including what the issue is, and to which version it is recommended to update. Also, it's vulnerable package source is limited - so use it with care. To run it locally, follow this <a href="https://github.com/omerlh/container-security-testing#dependency-scanning">part</a> on the readme.
+
+Running this scan on a CI/CD pipeline is important - but not enough. Maybe now, when I've pushed my code, there are no known vulnerabilities for the package I'm using - but what about tomorrow? Or in a month? I want to be notified in case of a vulnerability in one of the packages I'm using was disclosed. Although it is a critical feature, not all the tools are supporting it - including Retire.Net (Dependency Track does support <a href="https://docs.dependencytrack.org/integrations/notifications/">notifications</a>). If you're using Snyk (which is a great commercial production for packages scanning), it can be done easily - check out how <a href="https://medium.com/@omerlh/guarding-your-packages-with-snyk-and-icinga-667798cac6cc">here</a>.
+
+<h2 id="docker">Docker Image Scanning</h2>
+
+We have done testing our code - we automated code review and tested the packages that our app is using. Now it's time to test the docker image that is running our app. Our app is running inside this image, so it's important to make sure there is nothing vulnerable installed on it. This is similar to what was discussed in the previous section - there are 3rd party applications that are installed on the image we're using and it's critical to scan them (there are other things to tests, like using a <a href="https://github.com/hadolint/hadolint">linter</a> or running a virus scan).
+
+These packages are installed (most of the times) via the OS package manager (e.g. APT or APK). When using a base image (using a <code>FROM</code> directive), you have no idea what packages are installed in it - and this is why we need a tool to scan it. This is a bit more complicated case then before: first, finding all the packages that are installed on a docker image can be a challenge, especially with packages that are not installed with the package manager. And we still have the same challenge as before of finding all these vulnerable packages.
+
+There are two popular open source tools that can be used for docker image scanning - <a href="https://github.com/coreos/clair">Clair</a> and <a href="https://anchore.com/opensource/">Anchore Engine</a>. I chose Anchore Engine because the set up was easier. After loading an image into Anchore, you need to wait for the analysis to complete (more details on <a href="https://github.com/omerlh/container-security-testing#docker-image-scanning">the readme</a>). Then, you can get a JSON report of all the vulnerabilities in our image, here is one example vulnerability from the report (that contains many others):
+
+<pre><code><br />{
+"feed": "vulnerabilities",
+"feed_group": "debian:9",
+"fix": "None",
+"package": "libidn11-1.33-1",
+"package_cpe": "None",
+"package_name": "libidn11",
+"package_path": "None",
+"package_type": "dpkg",
+"package_version": "1.33-1",
+"severity": "High",
+"url": "https://security-tracker.debian.org/tracker/CVE-2017-14062",
+"vuln": "CVE-2017-14062"
+}
+
+</code></pre>
+
+We can see that we have a severity (high, oh no) and we can see there is no fix available (under filed <code>fix</code>) but no simple way to understand what the issue is (only a link). The last thing to notice is which package has this issue - <code>libidn11</code>. In case you, like me, have no idea what is this library - you can read about it <a href="https://www.gnu.org/software/libidn/">here</a>.
+
+This is a huge issue with docker image scanning. When scanning packages used by the app, the tool can tell us why a specific package is installed - either via a direct reference or transitive reference. This is not the case here. This package was installed by someone somewhere in the image history (maybe even indirectly), and now I, the end user, need to decide what to do. It's almost an impossible decision, and this why I'm not recommending scanning the packages inside docker images, at least for now. Running a tool in your CI/CD pipeline with an output that is not actionable is meaningless - it will be just ignored.
+
+I hope that in the near future we will see the tools improved, so the output we will get will be more actionable. Another thing that can be done is to fix all the vulnerabilities in the base image. While working on this post, I scanned the top 10 images on <a href="https://hub.docker.com/explore/">DockerHub</a>:
+
+<span class="note">[Image not available]</span>
+
+The scan performed using <a href="https://snyk.io/docs/snyk-for-docker">Snyk's docker support</a>). For each image, I pulled and scanned using the <code>latest</code> tag, and count the number of finding.
+
+As you can notice, all of these images (besides alpine) has many known vulnerabilities. This means that just by having <code>FROM: node:latest</code> in my dockerfile, I added more than 600 vulnerable packages. Ideally, image maintainers will run docker image scanning on the image they maintain, fix what should be fixed and publish the issues that shouldn't be fixed. This will make it a lot easier - all I have to worry about will be the packages I'm using. And I hope will see a change in this area in the near future - but this is up to us. We need to demand this from the maintainers.
+
+<h2 id="k8s">Kubernetes Files Scanning</h2>
+
+Finally, after we finish to scan the entire application, we need to scan the files that define how it's deployed. This section is the only section that is focused on Kubernetes - if you're not using Kubernetes, you can apply the same ideas to the orchestrator you're using.
+
+Writing a secure deployment file is tricky. For example, I can accidentally mount the host's docker socket. Doing so increase the attack surface significantly - the attacker now has full control over all the images running on the host. This mistake can happen because Kubernetes deployment files are complex - and usually, the simple way to write them is by using <a href="https://en.wikipedia.org/wiki/Copy_and_paste_programming">Copy Past Driven Development</a>. This is why we need to scan these files to detect all these issues - before the code is deployed to production.
+
+The simple way to achieve this is by using <a href="https://kubesec.io/">KubeSec</a>. KubeSec is an online service that analyzes Kubernetes deployment files for security issues. Using it is simply by uploading the files to the service (this might not work for an organization who is not willing to share it's deployment files). This is how the response looks like:
+
+<span class="note">[Image not available]</span>
+
+We can see (under the critical section) that KubeSec report just the issue I described - mounting the docker socket - with other issues. When possible, using KubeSec can help you mitigate this threat and help you write more secure Kubernetes deployment files. To see it live, check <a href="https://github.com/omerlh/container-security-testing#kubernetes-files-scanning">this part</a> of the readme.
+
+There are no good alternative tools to KubeSec that can work offline (or on-premise) that I'm aware of (if you know about such a tool - please share!). An alternative to KubeSec is not using raw Kubernetes files for deployment. For example, using <a href="https://blog.solutotlv.com/deploying-kubernetes-like-a-pro/?utm_source=omerlh">Helm</a> for deploying Kubernetes applications. Using Helm, you can create one good and secure package that the developers will use - and mitigate this issue.
+
+<h1>Wrapping Up</h1>
+
+Well, apparently I'm not that good developer - we find so many issues with my small tiny app! Luckily, using security tools I was able to spot and fix them in time. Mission accomplished!
+
+On a serious note, now you have all the information you need to write a more secure code - today. The best way to start is by choosing just one tool from the tools I've discussed here. Play with, understand it's value, and start the hard work of integrating it. The integration can be simplified by using <a href="https://github.com/OWASP/glue">OWASP Glue</a> - a tool that aims to ease the integration of security tools into the pipeline.
+
+The process of adopting security tests is an ongoing process. During the process, you can learn more about what works and what doesn't, and you'll probably discover new tools and abandon tools that you used in the past. This is why it's so important to start this process.
+
+I hope you enjoyed this post and find it usefull. I would like to hear back from you - what have you tried? What worked and what didn't? Which tools are missing here that I should have mentioned?</body></html>
