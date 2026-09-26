@@ -10,6 +10,9 @@ import re, html, glob, os, datetime
 
 BASE = 'https://omerlh.github.io'
 NAME = 'Omer Levi Hevroni'
+# GoatCounter site code (cookie-free, privacy-friendly stats). Leave empty until the code is registered:
+# an unregistered code could be claimed by someone else, who would then receive visitor data.
+GOATCOUNTER = ''
 NAV = [('posts/', 'Writing'), ('talks/', 'Talks'), ('about/', 'About'), ('archive/', 'Archive')]
 FAVICON = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23b8431b'/%3E"
            "%3Ctext x='32' y='43' font-size='30' font-family='Georgia,serif' font-weight='700' text-anchor='middle' fill='white'%3EOL%3C/text%3E%3C/svg%3E")
@@ -55,12 +58,13 @@ def layout(title, desc, body, path, active='', wide=False):
     nav = ''.join(f'<a href="{up}{h}"{" aria-current=page" if h == active else ""}>{t}</a>' for h, t in NAV)
     url = f'{BASE}/{path}'.rstrip('/') + ('/' if path else '')
     e = html.escape
+    analytics = (f'<script data-goatcounter="https://{GOATCOUNTER}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>' if GOATCOUNTER else '')
     return f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(title)}</title><meta name="description" content="{e(desc)}">
 <link rel="canonical" href="{url}"><link rel="icon" href="{FAVICON}"><link rel="stylesheet" href="{up}style.css">
 <meta property="og:title" content="{e(title)}"><meta property="og:description" content="{e(desc)}"><meta property="og:type" content="website"><meta property="og:url" content="{url}">
-<meta name="color-scheme" content="light"></head><body>
+<meta name="color-scheme" content="light">{analytics}</head><body>
 <header class="site"><div class="wrap{" wide" if wide else ""}"><a class="brand" href="{root}">Omer <span>Levi</span> Hevroni</a><nav>{nav}</nav></div></header>
 <main>{body}</main>
 <footer><div class="wrap"><span>© {datetime.date.today().year} {NAME}</span><span><a href="https://medium.com/@omerlh">Medium</a> · <a href="https://github.com/omerlh">GitHub</a> · <a href="https://www.linkedin.com/in/omerlh">LinkedIn</a> · <a href="https://x.com/omerlh">X</a></span></div></footer>
