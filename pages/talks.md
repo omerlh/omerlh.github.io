@@ -1,6 +1,8 @@
 # Talks
 
-I've spoken at conferences and meetups about DevOps, DevSecOps and application security. A selection, newest first.
+I spoke at conferences and meetups about DevOps, DevSecOps and application security between 2017 and 2020. Then the world paused, and so did I. I'd love to get back on stage soon. If you have an event in mind, [let's talk](https://www.linkedin.com/in/omerlh).
+
+Here's a selection, newest first.
 
 ## 2020
 
@@ -32,5 +34,3 @@ I've spoken at conferences and meetups about DevOps, DevSecOps and application s
 - **DevOpsDays Tel Aviv 2017**: Dynamic Security Tests with Zap
 - **Redis Day Tel Aviv**: Using Redis as a Primary Data Source Like a Pro
 - **DevSecCon Tel Aviv**: Secure Kubernetes CI/CD Pipeline
-
-Want me to speak at your event? [Get in touch](https://www.linkedin.com/in/omerlh).
