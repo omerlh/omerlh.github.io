@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>https://omerlh.github.io/</loc></url>
+<url><loc>https://omerlh.github.io/posts/</loc></url>
+<url><loc>https://omerlh.github.io/talks/</loc></url>
+<url><loc>https://omerlh.github.io/about/</loc></url>
+<url><loc>https://omerlh.github.io/archive/</loc></url>
+<url><loc>https://omerlh.github.io/posts/close-at-home/</loc></url>
+<url><loc>https://omerlh.github.io/archive/how-to-fast-and-secure-builds-with-bazel-remote-cache/</loc></url>
+<url><loc>https://omerlh.github.io/archive/how-to-awesome-ci-cd-for-macos-apps/</loc></url>
+<url><loc>https://omerlh.github.io/archive/how-to-build-go-c-code-for-windows-using-github-actions/</loc></url>
+<url><loc>https://omerlh.github.io/archive/nginx-ingress-the-security-hero-we-need/</loc></url>
+<url><loc>https://omerlh.github.io/archive/killing-classes-of-bugs-with-refined-types/</loc></url>
+<url><loc>https://omerlh.github.io/archive/lazy-developer-cron-job/</loc></url>
+<url><loc>https://omerlh.github.io/archive/using-github-pr-flow-with-terraform/</loc></url>
+<url><loc>https://omerlh.github.io/archive/appsec-learning-sre-principles-metrics-and-measurements/</loc></url>
+<url><loc>https://omerlh.github.io/archive/extending-kubernetes-with-crds-the-hard-way/</loc></url>
+<url><loc>https://omerlh.github.io/archive/a-production-thanos-deployment/</loc></url>
+<url><loc>https://omerlh.github.io/archive/solving-trust-issues-at-scale/</loc></url>
+<url><loc>https://omerlh.github.io/archive/istio-in-production/</loc></url>
+<url><loc>https://omerlh.github.io/archive/do-we-really-need-threat-modeling/</loc></url>
+<url><loc>https://omerlh.github.io/archive/debugging-ios-apps-with-zaproxy/</loc></url>
+<url><loc>https://omerlh.github.io/archive/monitoring-kubernetes-hpa-utilization/</loc></url>
+<url><loc>https://omerlh.github.io/archive/keeping-prometheus-in-shape/</loc></url>
+<url><loc>https://omerlh.github.io/archive/wiremock-for-fun-and-mocking/</loc></url>
+<url><loc>https://omerlh.github.io/archive/threat-modeling-as-code/</loc></url>
+<url><loc>https://omerlh.github.io/archive/whats-inside-the-box/</loc></url>
+<url><loc>https://omerlh.github.io/archive/hacking-juice-shop-the-devsecops-way/</loc></url>
+<url><loc>https://omerlh.github.io/archive/investigating-kubernetes-nodes-disk-usage/</loc></url>
+<url><loc>https://omerlh.github.io/archive/web-security-for-wordpress/</loc></url>
+<url><loc>https://omerlh.github.io/archive/write-good-code-with-security-tests/</loc></url>
+</urlset>
