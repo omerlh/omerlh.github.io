@@ -12,7 +12,7 @@ BASE = 'https://omerlh.github.io'
 NAME = 'Omer Levi Hevroni'
 # GoatCounter site code (cookie-free, privacy-friendly stats). Leave empty until the code is registered:
 # an unregistered code could be claimed by someone else, who would then receive visitor data.
-GOATCOUNTER = ''
+GOATCOUNTER = 'omerlh'
 NAV = [('posts/', 'Writing'), ('talks/', 'Talks'), ('about/', 'About'), ('archive/', 'Archive')]
 FAVICON = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23b8431b'/%3E"
            "%3Ctext x='32' y='43' font-size='30' font-family='Georgia,serif' font-weight='700' text-anchor='middle' fill='white'%3EOL%3C/text%3E%3C/svg%3E")
