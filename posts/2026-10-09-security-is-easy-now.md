@@ -10,6 +10,12 @@ Set up scanning. Learn a proxy tool. Click through the whole app by hand, slowly
 
 Then I noticed something: the tedious part, the *clicking around*, is exactly what an AI agent is good at. And the rest has been getting cheaper for a while, quietly.
 
+## I've been here before
+
+In 2018 I wrote [Want to Write Good Code? Start Using Security Tests](../../archive/write-good-code-with-security-tests/), arguing that you should wire security checks into your pipeline. Two months later I pointed the tools at the same deliberately broken shop in [Hacking Juice Shop, the DevSecOps Way](../../archive/hacking-juice-shop-the-devsecops-way/). In 2019 I was still [hand-wiring ZAP as a proxy](../../archive/debugging-ios-apps-with-zaproxy/) just to see my own traffic. And I spent a lot of words on [whether we even need threat modeling](../../archive/do-we-really-need-threat-modeling/) and on [doing it as code](../../archive/threat-modeling-as-code/).
+
+Eight years ago that took a weekend of YAML, Docker flags and patience. Today it boils down to one line to install and one paragraph to ask.
+
 ## Layer one: don't leak things
 
 This website is a static folder of Markdown on GitHub Pages. Nothing to hack, you'd think. But a repo can still leak, so it has three guards:
@@ -53,6 +59,8 @@ The server groups alerts by type, so those 63 became **7 findings**:
 - A session ID travelling in the URL
 - A private IP address leaking from an admin endpoint
 - A few missing headers and timestamp disclosures
+
+The second half of the problem is the report, so the server also ships a triage skill. It classifies each finding as real, noise or needs-verification, rates it with the [OWASP Risk Rating Methodology](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology) (likelihood times impact), and writes a short report with evidence and a concrete fix for each item. Same Juice Shop run, but now the output is something I could hand to a developer.
 
 Seven things is a to-do list. Sixty-three is a wall. The grouping did more for me than any clever scanning trick: it turned the output into something an agent, or a person, can actually triage.
 
