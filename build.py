@@ -39,6 +39,20 @@ def blocks(lines):
         if m:
             n = len(m.group(1)); out.append(f'<h{n}>{inline(m.group(2))}</h{n}>'); i += 1; continue
         if l.strip() == '---': out.append('<hr>'); i += 1; continue
+        if l.startswith('```'):
+            code = []; i += 1
+            while i < len(lines) and not lines[i].startswith('```'): code.append(lines[i]); i += 1
+            i += 1
+            out.append('<pre><code>' + html.escape('\n'.join(code), quote=False) + '</code></pre>'); continue
+        if l.startswith('|'):
+            rows = []
+            while i < len(lines) and lines[i].startswith('|'):
+                if not re.match(r'^\|[\s|:-]+\|?$', lines[i]):
+                    rows.append([c.strip() for c in lines[i].strip().strip('|').split('|')])
+                i += 1
+            head, body_rows = rows[0], rows[1:]
+            out.append('<table><thead><tr>' + ''.join(f'<th>{inline(c)}</th>' for c in head) + '</tr></thead><tbody>'
+                       + ''.join('<tr>' + ''.join(f'<td>{inline(c)}</td>' for c in r) + '</tr>' for r in body_rows) + '</tbody></table>'); continue
         if re.match(r'\s*([-*]|\d+\.) ', l):
             tag = 'ol' if re.match(r'\s*\d+\.', l) else 'ul'
             items = []
@@ -46,12 +60,12 @@ def blocks(lines):
                 items.append(re.sub(r'^\s*([-*]|\d+\.) ', '', lines[i])); i += 1
             out.append(f'<{tag}>' + ''.join(f'<li>{inline(x)}</li>' for x in items) + f'</{tag}>'); continue
         p = []
-        while i < len(lines) and lines[i].strip() and not re.match(r'(#{1,3} |>|---|\s*([-*]|\d+\.) )', lines[i]):
+        while i < len(lines) and lines[i].strip() and not re.match(r'(#{1,3} |>|---|```|\||\s*([-*]|\d+\.) )', lines[i]):
             p.append(lines[i]); i += 1
         out.append('<p>' + inline(' '.join(p)) + '</p>')
     return '\n'.join(out)
 
-def layout(title, desc, body, path, active='', wide=False):
+def layout(title, desc, body, path, active='', wide=False, kind='website'):
     """path is the page's URL path relative to the site root, e.g. 'posts/x/'."""
     up = '../' * path.strip('/').count('/') + ('../' if path.strip('/') else '') if False else '../' * (len([p for p in path.split('/') if p]))
     root = up or './'
@@ -63,7 +77,7 @@ def layout(title, desc, body, path, active='', wide=False):
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(title)}</title><meta name="description" content="{e(desc)}">
 <link rel="canonical" href="{url}"><link rel="icon" href="{FAVICON}"><link rel="stylesheet" href="{up}style.css">
-<meta property="og:title" content="{e(title)}"><meta property="og:description" content="{e(desc)}"><meta property="og:type" content="website"><meta property="og:url" content="{url}">
+<meta property="og:title" content="{e(title)}"><meta property="og:description" content="{e(desc)}"><meta property="og:type" content="{kind}"><meta property="og:url" content="{url}">
 <meta name="color-scheme" content="light">{analytics}</head><body>
 <header class="site"><div class="wrap{" wide" if wide else ""}"><a class="brand" href="{root}">Omer <span>Levi</span> Hevroni</a><nav>{nav}</nav></div></header>
 <main>{body}</main>
@@ -84,11 +98,13 @@ for f in sorted(glob.glob('posts/*.md'), reverse=True):
     lines = open(f).read().splitlines()
     title = re.sub(r'^# ', '', next(l for l in lines if l.startswith('# ')))
     sub = next((re.sub(r'^\*Subtitle: (.*)\*$', r'\1', l) for l in lines if l.startswith('*Subtitle:')), '')
-    body = blocks([l for l in lines if not l.startswith('# ') and not l.startswith('*Subtitle:')])
+    meta_title = next((re.sub(r'^\*Title: (.*)\*$', r'\1', l) for l in lines if l.startswith('*Title:')), title)
+    meta_desc = next((re.sub(r'^\*Description: (.*)\*$', r'\1', l) for l in lines if l.startswith('*Description:')), sub)
+    body = blocks([l for l in lines if not l.startswith(('# ', '*Subtitle:', '*Title:', '*Description:'))])
     nice = datetime.date.fromisoformat(date).strftime('%B %-d, %Y')
     mins = max(1, round(words(body) / 220))
     art = f'<div class="wrap"><article><h1>{html.escape(title)}</h1><p class="deck">{html.escape(sub)}</p><p class="meta">{nice} · {mins} min read · <a href="https://medium.com/@omerlh">Also on Medium</a></p>{body}</article></div>'
-    write(f'posts/{slug}/index.html', layout(title, sub, art, f'posts/{slug}/', 'posts/'))
+    write(f'posts/{slug}/index.html', layout(meta_title, meta_desc, art, f'posts/{slug}/', 'posts/', kind='article'))
     posts.append(dict(date=date, slug=slug, title=title, sub=sub, mins=mins, nice=nice))
 
 def card(p, up=''):

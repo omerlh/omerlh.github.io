@@ -1,18 +1,22 @@
 # I Hired an AI to Hack a Shop While I Made Coffee. Security Got Easy When I Wasn't Looking.
 
 *Subtitle: In 2018 it took me a weekend of YAML. Now it's one line and one paragraph.*
+*Title: Security Got Easy: Testing a Web App with an AI Agent and ZAP*
+*Description: I pointed an AI agent and a ZAP MCP server at OWASP Juice Shop. 63 scanner alerts became 7 findings. Setup is one line.*
 
 ---
 
 I asked my new employee to break into a web shop.
 
-It registered an account. It logged in. It searched for juice, filled a basket, opened the profile page. Then it came back with a list: seven things to fix, ordered by how much they matter, each with a one-line reason.
+It registered an account. It logged in. It searched for juice, filled a basket, opened the profile page. Then it came back with a list: seven findings, grouped from 63 raw alerts.
 
 I had a coffee in that time. Not a good one. It was still too hot to drink, which is more patience than I've ever shown a scanner.
 
 I come from application security, so I don't say this lightly: **the hardest part of security used to be getting started. That part is mostly gone.**
 
-## I've been here before
+The short version: I connected an AI agent to [OWASP ZAP](https://www.zaproxy.org) through a small MCP server, had it browse OWASP Juice Shop like a user, and 63 raw alerts became 7 findings. Installing it is one command.
+
+## From a weekend of YAML in 2018 to one line today
 
 In 2018 I wrote [Want to Write Good Code? Start Using Security Tests](../../archive/write-good-code-with-security-tests/), arguing that security checks belong in the pipeline. Two months later I pointed the tools at a deliberately broken shop in [Hacking Juice Shop, the DevSecOps Way](../../archive/hacking-juice-shop-the-devsecops-way/). In 2019 I was still [hand-wiring ZAP as a proxy](../../archive/debugging-ios-apps-with-zaproxy/) just to see my own traffic. And I spent an unreasonable number of words on [whether we even need threat modeling](../../archive/do-we-really-need-threat-modeling/), and then on [doing it as code](../../archive/threat-modeling-as-code/).
 
@@ -20,7 +24,7 @@ Eight years ago, that was a weekend of YAML, Docker flags and patience. A weeken
 
 Today it boils down to this: **one line to install, one paragraph to ask.**
 
-## Layer one: don't leak things
+## Layer one: keep secrets out of your repo
 
 This website is a folder of Markdown on GitHub Pages. Nothing to hack, you'd think. But a repo can still leak, so it has three guards:
 
@@ -32,7 +36,7 @@ Setup time: an afternoon, most of it spent reading docs and pretending I'd alrea
 
 That's the right shape for security: **silent when boring, loud when it matters.**
 
-## Layer two: the part I always skipped
+## Layer two: test the running app with an AI agent and ZAP
 
 Scanning code is the easy half. The half I never did was testing a *running* app, because it needs someone to use it like a user would: register, log in, search, fill a basket. That's how a scanner sees real traffic.
 
@@ -46,7 +50,7 @@ So I built [**zap-mcp**](https://github.com/omerlh/zap-mcp), a small [MCP](https
 | `zap_get_alerts` | Returns what ZAP found, grouped and sorted by risk |
 | `zap_stop` | Cleans up |
 
-The agent drives a real browser *through* ZAP. ZAP quietly watches every request and response. Nothing is attacked: it's passive scanning only, so it's safe by default.
+The agent drives a real browser *through* ZAP. ZAP quietly watches every request and response. The scan itself is passive: ZAP only watches. Proving a finding later replays a request, read-only.
 
 Installing it is one line:
 
@@ -54,7 +58,7 @@ Installing it is one line:
 claude mcp add zap -- npx -y github:omerlh/zap-mcp
 ```
 
-## The test drive
+## Test drive: 63 ZAP alerts on Juice Shop became 7 findings
 
 I pointed it at [OWASP Juice Shop](https://owasp.org/www-project-juice-shop/), a shop that is vulnerable on purpose, so nobody gets hurt. My instruction, roughly: *register a user, log in, search, add things to the basket, open the profile, then tell me what matters.*
 
@@ -70,9 +74,9 @@ The server groups alerts by type, so the 63 became **7 findings**:
 
 Seven things is a to-do list. Sixty-three is a wall. **The grouping did more for me than any clever scanning trick.**
 
-## The real pain: the pile
+## Triage: prove every alert (PoC or GTFO)
 
-Ask anyone who has run a security tool what they hate most. It's not the setup. It's the output.
+Ask anyone who has run a security tool what they hate most. The setup is annoying, but the output is the real pain.
 
 Hundreds of alerts. Half of them noise, a quarter "informational," and the one that matters sits on page nine. So the report gets filed under "later," which is where security reports go to retire.
 
@@ -88,9 +92,9 @@ Every alert is a hypothesis. Before anything reaches the report, the agent tries
 
 The proofs are minimal and read-only, on apps you own or are allowed to test. This isn't an attacker; it's the colleague who checks before filing the ticket.
 
-The goal: 63 alerts in, a short report out, and every line in it something you can reproduce. **I can worry less, because the list is short and true.**
+The goal: 63 alerts in, a short report out, and every line in it something you can reproduce. **I'd worry less, because the list would be short and true.**
 
-## Don't be the madman with the list
+## Let the agent fix it: scan, prove, patch, verify
 
 Security has an image problem. It's the person who shows up at the end, points at your code, and leaves a PDF.
 
@@ -106,9 +110,9 @@ So the second prompt in the repo is for a **coding agent that lives in your repo
 
 It never pushes until I say so, and it only touches a local or test app. It's not allowed to "fix" a finding by switching off the alert. (I've met humans who consider that a valid strategy.)
 
-The pull request is the part I like. It doesn't say "your CORS is bad." It says "here was the request, here was the response, here is the change, here is the same request after." A reviewer can read that over coffee.
+The pull request is the part I'm aiming for. It shouldn't say "your CORS is bad." It says "here was the request, here was the response, here is the change, here is the same request after." A reviewer can read that over coffee.
 
-I'm not claiming a victory lap. At [Ledge](https://ledge.co) we have a nightly ZAP run set up as a Cursor automation, so the scan-and-prove half now happens while everyone sleeps, and the fixes are the experiment we're starting now. I'll write up what it gets right and what it gets embarrassingly wrong.
+I'm not claiming a victory lap. At [Ledge](https://ledge.co) we're setting up a nightly ZAP scan, and the prove-and-fix half is the experiment we're starting now. I'll write up what it gets right and what it gets embarrassingly wrong.
 
 ## What actually changed
 
@@ -116,7 +120,7 @@ Nothing here is new science. ZAP is old. Secret scanners are old. What changed:
 
 1. **Setup collapsed.** One line to install a tool, one afternoon to wire CI.
 2. **The manual labour moved to an agent.** It clicks, I read the verdict.
-3. **The noise got a filter with a conscience.** Security tools used to hand you a list and a guilt trip. Now they hand you the five things that are real.
+3. **The noise got a filter with a conscience.** Security tools used to hand you a list and a guilt trip. Now they hand you the few things that are real.
 
 Limits, because there are always limits: passive browsing only finds what it visits, and proving a finding is not a full penetration test. It's a smoke detector that checks the fire before it screams. Still better than a fire inspector who visits once a year.
 
@@ -130,6 +134,6 @@ If you've been putting this off like I was, here's the smallest useful version:
 
 Security used to feel like a project. It now feels like a habit you can start before lunch.
 
-*Next: I let the agent fix a whole app and report back. I'm told this is how it starts.*
+*Next: I let the agent try to fix a whole app and report back. I'm told this is how it starts.*
 
 *What's the security task you keep postponing? Tell me, and I'll tell you if an agent can take it.*
