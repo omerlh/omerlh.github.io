@@ -1,42 +1,53 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>I Had an AI Pen-Test a Shop While I Watched. Security Got Easy When I Wasn&#x27;t Looking.</title><meta name="description" content="Secret scanning, dependency checks and a web security scan: an afternoon each, or less.">
+<title>I Hired an AI to Hack a Shop While I Made Coffee. Security Got Easy When I Wasn&#x27;t Looking.</title><meta name="description" content="In 2018 it took me a weekend of YAML. Now it&#x27;s one line and one paragraph.">
 <link rel="canonical" href="https://omerlh.github.io/posts/security-is-easy-now/"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23b8431b'/%3E%3Ctext x='32' y='43' font-size='30' font-family='Georgia,serif' font-weight='700' text-anchor='middle' fill='white'%3EOL%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="../../style.css">
-<meta property="og:title" content="I Had an AI Pen-Test a Shop While I Watched. Security Got Easy When I Wasn&#x27;t Looking."><meta property="og:description" content="Secret scanning, dependency checks and a web security scan: an afternoon each, or less."><meta property="og:type" content="website"><meta property="og:url" content="https://omerlh.github.io/posts/security-is-easy-now/">
+<meta property="og:title" content="I Hired an AI to Hack a Shop While I Made Coffee. Security Got Easy When I Wasn&#x27;t Looking."><meta property="og:description" content="In 2018 it took me a weekend of YAML. Now it&#x27;s one line and one paragraph."><meta property="og:type" content="website"><meta property="og:url" content="https://omerlh.github.io/posts/security-is-easy-now/">
 <meta name="color-scheme" content="light"><script data-goatcounter="https://omerlh.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script></head><body>
 <header class="site"><div class="wrap"><a class="brand" href="../../">Omer <span>Levi</span> Hevroni</a><nav><a href="../../posts/" aria-current=page>Writing</a><a href="../../talks/">Talks</a><a href="../../about/">About</a><a href="../../archive/">Archive</a></nav></div></header>
-<main><div class="wrap"><article><h1>I Had an AI Pen-Test a Shop While I Watched. Security Got Easy When I Wasn&#x27;t Looking.</h1><p class="deck">Secret scanning, dependency checks and a web security scan: an afternoon each, or less.</p><p class="meta">October 9, 2026 · 4 min read · <a href="https://medium.com/@omerlh">Also on Medium</a></p><hr>
-<p>For years, "do security properly" meant a long list of things I would get to next quarter.</p>
-<p>Set up scanning. Learn a proxy tool. Click through the whole app by hand, slowly, while a second window fills with alerts nobody reads. I knew what good looked like. I also knew I wasn't going to do it on a Tuesday evening.</p>
-<p>Then I noticed something: the tedious part, the <em>clicking around</em>, is exactly what an AI agent is good at. And the rest has been getting cheaper for a while, quietly.</p>
+<main><div class="wrap"><article><h1>I Hired an AI to Hack a Shop While I Made Coffee. Security Got Easy When I Wasn&#x27;t Looking.</h1><p class="deck">In 2018 it took me a weekend of YAML. Now it&#x27;s one line and one paragraph.</p><p class="meta">October 9, 2026 · 5 min read · <a href="https://medium.com/@omerlh">Also on Medium</a></p><hr>
+<p>I asked my new employee to break into a web shop.</p>
+<p>It registered an account. It logged in. It searched for juice, filled a basket, opened the profile page. Then it came back with a list: seven things to fix, ordered by how much they matter, each with a one-line reason.</p>
+<p>I had a coffee in that time. Not a good one. It was still cooling.</p>
+<p>I come from application security, so I don't say this lightly: <strong>the hardest part of security used to be getting started. That part is mostly gone.</strong></p>
 <h2>I've been here before</h2>
-<p>In 2018 I wrote <a href="../../archive/write-good-code-with-security-tests/">Want to Write Good Code? Start Using Security Tests</a>, arguing that you should wire security checks into your pipeline. Two months later I pointed the tools at the same deliberately broken shop in <a href="../../archive/hacking-juice-shop-the-devsecops-way/">Hacking Juice Shop, the DevSecOps Way</a>. In 2019 I was still <a href="../../archive/debugging-ios-apps-with-zaproxy/">hand-wiring ZAP as a proxy</a> just to see my own traffic. And I spent a lot of words on <a href="../../archive/do-we-really-need-threat-modeling/">whether we even need threat modeling</a> and on <a href="../../archive/threat-modeling-as-code/">doing it as code</a>.</p>
-<p>Eight years ago that took a weekend of YAML, Docker flags and patience. Today it boils down to one line to install and one paragraph to ask.</p>
+<p>In 2018 I wrote <a href="../../archive/write-good-code-with-security-tests/">Want to Write Good Code? Start Using Security Tests</a>, arguing that security checks belong in the pipeline. Two months later I pointed the tools at a deliberately broken shop in <a href="../../archive/hacking-juice-shop-the-devsecops-way/">Hacking Juice Shop, the DevSecOps Way</a>. In 2019 I was still <a href="../../archive/debugging-ios-apps-with-zaproxy/">hand-wiring ZAP as a proxy</a> just to see my own traffic. And I spent an unreasonable number of words on <a href="../../archive/do-we-really-need-threat-modeling/">whether we even need threat modeling</a>, and then on <a href="../../archive/threat-modeling-as-code/">doing it as code</a>.</p>
+<p>Eight years ago, that was a weekend of YAML, Docker flags and patience. A weekend I would have spent outside, like a person.</p>
+<p>Today it boils down to this: <strong>one line to install, one paragraph to ask.</strong></p>
 <h2>Layer one: don't leak things</h2>
-<p>This website is a static folder of Markdown on GitHub Pages. Nothing to hack, you'd think. But a repo can still leak, so it has three guards:</p>
-<ul><li><strong><a href="https://github.com/gitleaks/gitleaks">Gitleaks</a></strong> runs in CI and fails the build if a secret sneaks into a commit.</li><li><strong><a href="https://snyk.io">Snyk</a></strong> is connected through its GitHub integration and checks dependencies and code.</li><li><strong><code>main</code> is protected.</strong> Everything goes through a pull request, and every GitHub Action is pinned to a commit SHA, so a compromised tag can't swap code under me.</li></ul>
-<p>Setup time for all of it: an afternoon, most of it reading docs. Running cost: zero attention, until something is actually wrong.</p>
+<p>This website is a folder of Markdown on GitHub Pages. Nothing to hack, you'd think. But a repo can still leak, so it has three guards:</p>
+<ul><li><strong><a href="https://github.com/gitleaks/gitleaks">Gitleaks</a></strong> runs in CI and fails the build if a secret sneaks into a commit.</li><li><strong><a href="https://snyk.io">Snyk</a></strong> is connected through its GitHub integration and watches dependencies and code.</li><li><strong><code>main</code> is protected.</strong> Everything goes through a pull request, and every GitHub Action is pinned to a commit SHA, so a compromised tag can't swap the code under me.</li></ul>
+<p>Setup time: an afternoon, most of it reading docs. Running cost: zero attention, until something is actually wrong.</p>
+<p>That's the right shape for security: <strong>silent when boring, loud when it matters.</strong></p>
 <h2>Layer two: the part I always skipped</h2>
-<p>Scanning code is the easy half. The half I never did was testing a <em>running</em> app, because it needs a human to use it like a user would: register, log in, search, fill a basket. That's what makes the scanner see real traffic.</p>
-<p>So I built a small thing. <a href="https://github.com/omerlh/zap-mcp"><strong>zap-mcp</strong></a> is an <a href="https://modelcontextprotocol.io">MCP</a> server with three tools:</p>
+<p>Scanning code is the easy half. The half I never did was testing a <em>running</em> app, because it needs someone to use it like a user would: register, log in, search, fill a basket. That's how a scanner sees real traffic.</p>
+<p>It's also the most tedious job in security. Which makes it a perfect job for an agent.</p>
+<p>So I built <a href="https://github.com/omerlh/zap-mcp"><strong>zap-mcp</strong></a>, a small <a href="https://modelcontextprotocol.io">MCP</a> server with three tools:</p>
 <p>| Tool | What it does | |---|---| | <code>zap_start</code> | Starts <a href="https://www.zaproxy.org">ZAP</a> in Docker as a proxy | | <code>zap_get_alerts</code> | Returns what ZAP found, grouped and sorted by risk | | <code>zap_stop</code> | Cleans up |</p>
-<p>The agent drives a real browser <em>through</em> ZAP. ZAP quietly watches every request and response. There's no attacking: it's passive scanning only, so it's safe by default. Then the agent reads the alerts and tells me what matters.</p>
+<p>The agent drives a real browser <em>through</em> ZAP. ZAP quietly watches every request and response. Nothing is attacked: it's passive scanning only, so it's safe by default.</p>
 <p>Installing it is one line:</p>
 <p>``<code>bash claude mcp add zap -- npx -y github:omerlh/zap-mcp </code>``</p>
 <h2>The test drive</h2>
-<p>I pointed it at <a href="https://owasp.org/www-project-juice-shop/">OWASP Juice Shop</a>, a shop that is vulnerable on purpose, so nobody gets hurt. The instruction was roughly: <em>register a user, log in, search, add things to the basket, open the profile, then triage what ZAP found.</em></p>
-<p>The browsing produced <strong>63 alerts</strong>. That is exactly the number at which a human closes the tab.</p>
-<p>The server groups alerts by type, so those 63 became <strong>7 findings</strong>:</p>
+<p>I pointed it at <a href="https://owasp.org/www-project-juice-shop/">OWASP Juice Shop</a>, a shop that is vulnerable on purpose, so nobody gets hurt. My instruction, roughly: <em>register a user, log in, search, add things to the basket, open the profile, then tell me what matters.</em></p>
+<p>The browsing produced <strong>63 alerts</strong>. That is exactly the number at which a human closes the tab and remembers an urgent errand.</p>
+<p>The server groups alerts by type, so the 63 became <strong>7 findings</strong>:</p>
 <ul><li>Permissive CORS (<code>Access-Control-Allow-Origin: *</code>) across 27 URLs</li><li>No Content Security Policy</li><li>A session ID travelling in the URL</li><li>A private IP address leaking from an admin endpoint</li><li>A few missing headers and timestamp disclosures</li></ul>
-<p>The second half of the problem is the report, so the server also ships a triage skill. It classifies each finding as real, noise or needs-verification, rates it with the <a href="https://owasp.org/www-community/OWASP_Risk_Rating_Methodology">OWASP Risk Rating Methodology</a> (likelihood times impact), and writes a short report with evidence and a concrete fix for each item. Same Juice Shop run, but now the output is something I could hand to a developer.</p>
-<p>Seven things is a to-do list. Sixty-three is a wall. The grouping did more for me than any clever scanning trick: it turned the output into something an agent, or a person, can actually triage.</p>
+<p>Seven things is a to-do list. Sixty-three is a wall. <strong>The grouping did more for me than any clever scanning trick.</strong></p>
+<h2>Finding things is half the job</h2>
+<p>A list of findings isn't a report. It's homework you assign yourself.</p>
+<p>So the repo also ships a <strong>triage skill</strong>. For each finding it decides: real, noise, or <em>needs a human to check</em>. Then it rates the real ones with the <a href="https://owasp.org/www-community/OWASP_Risk_Rating_Methodology">OWASP Risk Rating Methodology</a>: how likely is it, how bad would it be, so what do I fix first? And it writes a short report with the evidence and a concrete fix for each item.</p>
+<p>Three things I like about it:</p>
+<ul><li><strong>It rates in context.</strong> ZAP rates the <em>type</em> of issue. The skill asks what it means <em>in this app</em>.</li><li><strong>It says what it didn't test.</strong> Passive scanning sees only the pages it visited, and the report says so up front.</li><li><strong>It never calls a guess a fact.</strong> "Needs verification" is a respectable answer. I know people who've never said it.</li></ul>
+<p>Same Juice Shop run, but now the output is something I could hand to a developer without a meeting.</p>
 <h2>What actually changed</h2>
 <p>Nothing here is new science. ZAP is old. Secret scanners are old. What changed is the cost of the boring bit:</p>
-<ol><li><strong>Setup collapsed.</strong> One line to install a tool, one afternoon to wire CI.</li><li><strong>The manual labour moved to an agent.</strong> It clicks, I read the summary.</li><li><strong>Output got shaped for triage,</strong> which matters more than coverage, because a report nobody reads protects nothing.</li></ol>
-<p>There are limits, and they matter. Passive scanning finds hygiene problems, not deep logic bugs. It is a smoke detector, not a penetration test, and it only belongs on apps you're allowed to test. But a smoke detector in every house beats a fire inspector who visits once a year.</p>
-<h2>Your turn</h2>
+<ol><li><strong>Setup collapsed.</strong> One line to install a tool, one afternoon to wire CI.</li><li><strong>The manual labour moved to an agent.</strong> It clicks, I read the verdict.</li><li><strong>The output got shaped for decisions.</strong> A report nobody reads protects nothing.</li></ol>
+<p>There are limits, and they matter. Passive scanning finds hygiene problems, not deep logic bugs. It's a smoke detector, not a penetration test, and it belongs only on apps you're allowed to test. But a smoke detector in every house beats a fire inspector who visits once a year.</p>
+<h2>Steal this</h2>
 <p>If you've been putting this off like I was, here's the smallest useful version:</p>
-<ol><li>Add a secret scanner to CI. Today.</li><li>Protect your main branch and pin your Actions.</li><li>Run the ZAP MCP against something that's yours, or against Juice Shop first.</li></ol>
-<p>Security used to feel like a project. It now feels like a habit you can start before lunch.</p></article></div></main>
+<ol><li><strong>Add a secret scanner to CI.</strong> Today. It takes less time than this post.</li><li><strong>Protect <code>main</code> and pin your Actions.</strong> Make the safe path the only path.</li><li><strong>Run the ZAP MCP against Juice Shop first.</strong> Then against something that's yours.</li></ol>
+<p>Security used to feel like a project. It now feels like a habit you can start before lunch.</p>
+<p><em>Next: giving the same agent a harder job than clicking around. I'm told that's how it starts.</em></p>
+<p><em>What's the security task you keep postponing? Tell me, and I'll tell you if an agent can take it.</em></p></article></div></main>
 <footer><div class="wrap"><span>© 2026 Omer Levi Hevroni</span><span><a href="https://medium.com/@omerlh">Medium</a> · <a href="https://github.com/omerlh">GitHub</a> · <a href="https://www.linkedin.com/in/omerlh">LinkedIn</a> · <a href="https://x.com/omerlh">X</a></span></div></footer>
 </body></html>
