@@ -8,20 +8,20 @@
 <main><div class="wrap"><article><h1>I Hired an AI to Hack a Shop While I Made Coffee. Security Got Easy When I Wasn&#x27;t Looking.</h1><p class="deck">In 2018 it took me a weekend of YAML. Now it&#x27;s one line and one paragraph.</p><p class="meta">October 9, 2026 · 5 min read · <a href="https://medium.com/@omerlh">Also on Medium</a></p><hr>
 <p>I asked my new employee to break into a web shop.</p>
 <p>It registered an account. It logged in. It searched for juice, filled a basket, opened the profile page. Then it came back with a list: seven things to fix, ordered by how much they matter, each with a one-line reason.</p>
-<p>I had a coffee in that time. Not a good one. It was still cooling.</p>
+<p>I had a coffee in that time. Not a good one. It was still too hot to drink, which is more patience than I've ever shown a scanner.</p>
 <p>I come from application security, so I don't say this lightly: <strong>the hardest part of security used to be getting started. That part is mostly gone.</strong></p>
 <h2>I've been here before</h2>
 <p>In 2018 I wrote <a href="../../archive/write-good-code-with-security-tests/">Want to Write Good Code? Start Using Security Tests</a>, arguing that security checks belong in the pipeline. Two months later I pointed the tools at a deliberately broken shop in <a href="../../archive/hacking-juice-shop-the-devsecops-way/">Hacking Juice Shop, the DevSecOps Way</a>. In 2019 I was still <a href="../../archive/debugging-ios-apps-with-zaproxy/">hand-wiring ZAP as a proxy</a> just to see my own traffic. And I spent an unreasonable number of words on <a href="../../archive/do-we-really-need-threat-modeling/">whether we even need threat modeling</a>, and then on <a href="../../archive/threat-modeling-as-code/">doing it as code</a>.</p>
-<p>Eight years ago, that was a weekend of YAML, Docker flags and patience. A weekend I would have spent outside, like a person.</p>
+<p>Eight years ago, that was a weekend of YAML, Docker flags and patience. A weekend I would otherwise have spent playing Civilization VII, so honestly, a loss for no one. (My CFO still says to wait for a sale.)</p>
 <p>Today it boils down to this: <strong>one line to install, one paragraph to ask.</strong></p>
 <h2>Layer one: don't leak things</h2>
 <p>This website is a folder of Markdown on GitHub Pages. Nothing to hack, you'd think. But a repo can still leak, so it has three guards:</p>
 <ul><li><strong><a href="https://github.com/gitleaks/gitleaks">Gitleaks</a></strong> runs in CI and fails the build if a secret sneaks into a commit.</li><li><strong><a href="https://snyk.io">Snyk</a></strong> is connected through its GitHub integration and watches dependencies and code.</li><li><strong><code>main</code> is protected.</strong> Everything goes through a pull request, and every GitHub Action is pinned to a commit SHA, so a compromised tag can't swap the code under me.</li></ul>
-<p>Setup time: an afternoon, most of it reading docs. Running cost: zero attention, until something is actually wrong.</p>
+<p>Setup time: an afternoon, most of it spent reading docs and pretending I'd already read them. Running cost: zero attention, until something is actually wrong.</p>
 <p>That's the right shape for security: <strong>silent when boring, loud when it matters.</strong></p>
 <h2>Layer two: the part I always skipped</h2>
 <p>Scanning code is the easy half. The half I never did was testing a <em>running</em> app, because it needs someone to use it like a user would: register, log in, search, fill a basket. That's how a scanner sees real traffic.</p>
-<p>It's also the most tedious job in security. Which makes it a perfect job for an agent.</p>
+<p>It's also the most tedious job in security. For years my plan was "I'll do it next quarter." I have been saying next quarter since 2018. Which makes it a perfect job for an agent: it doesn't procrastinate, and it doesn't need a snack.</p>
 <p>So I built <a href="https://github.com/omerlh/zap-mcp"><strong>zap-mcp</strong></a>, a small <a href="https://modelcontextprotocol.io">MCP</a> server with three tools:</p>
 <p>| Tool | What it does | |---|---| | <code>zap_start</code> | Starts <a href="https://www.zaproxy.org">ZAP</a> in Docker as a proxy | | <code>zap_get_alerts</code> | Returns what ZAP found, grouped and sorted by risk | | <code>zap_stop</code> | Cleans up |</p>
 <p>The agent drives a real browser <em>through</em> ZAP. ZAP quietly watches every request and response. Nothing is attacked: it's passive scanning only, so it's safe by default.</p>
@@ -37,7 +37,7 @@
 <p>A list of findings isn't a report. It's homework you assign yourself.</p>
 <p>So the repo also ships a <strong>triage skill</strong>. For each finding it decides: real, noise, or <em>needs a human to check</em>. Then it rates the real ones with the <a href="https://owasp.org/www-community/OWASP_Risk_Rating_Methodology">OWASP Risk Rating Methodology</a>: how likely is it, how bad would it be, so what do I fix first? And it writes a short report with the evidence and a concrete fix for each item.</p>
 <p>Three things I like about it:</p>
-<ul><li><strong>It rates in context.</strong> ZAP rates the <em>type</em> of issue. The skill asks what it means <em>in this app</em>.</li><li><strong>It says what it didn't test.</strong> Passive scanning sees only the pages it visited, and the report says so up front.</li><li><strong>It never calls a guess a fact.</strong> "Needs verification" is a respectable answer. I know people who've never said it.</li></ul>
+<ul><li><strong>It rates in context.</strong> ZAP rates the <em>type</em> of issue. The skill asks what it means <em>in this app</em>.</li><li><strong>It says what it didn't test.</strong> Passive scanning sees only the pages it visited, and the report says so up front.</li><li><strong>It never calls a guess a fact.</strong> "Needs verification" is a respectable answer. I know people who've never said it. I am, on a bad day, one of them.</li></ul>
 <p>Same Juice Shop run, but now the output is something I could hand to a developer without a meeting.</p>
 <h2>What actually changed</h2>
 <p>Nothing here is new science. ZAP is old. Secret scanners are old. What changed is the cost of the boring bit:</p>
@@ -45,7 +45,7 @@
 <p>There are limits, and they matter. Passive scanning finds hygiene problems, not deep logic bugs. It's a smoke detector, not a penetration test, and it belongs only on apps you're allowed to test. But a smoke detector in every house beats a fire inspector who visits once a year.</p>
 <h2>Steal this</h2>
 <p>If you've been putting this off like I was, here's the smallest useful version:</p>
-<ol><li><strong>Add a secret scanner to CI.</strong> Today. It takes less time than this post.</li><li><strong>Protect <code>main</code> and pin your Actions.</strong> Make the safe path the only path.</li><li><strong>Run the ZAP MCP against Juice Shop first.</strong> Then against something that's yours.</li></ol>
+<ol><li><strong>Add a secret scanner to CI.</strong> Today. It takes less time than reading this post, and I'm not even sorry about the length.</li><li><strong>Protect <code>main</code> and pin your Actions.</strong> Make the safe path the only path.</li><li><strong>Run the ZAP MCP against Juice Shop first.</strong> Then against something that's yours.</li></ol>
 <p>Security used to feel like a project. It now feels like a habit you can start before lunch.</p>
 <p><em>Next: giving the same agent a harder job than clicking around. I'm told that's how it starts.</em></p>
 <p><em>What's the security task you keep postponing? Tell me, and I'll tell you if an agent can take it.</em></p></article></div></main>

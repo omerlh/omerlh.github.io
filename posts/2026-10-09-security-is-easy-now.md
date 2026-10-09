@@ -8,7 +8,7 @@ I asked my new employee to break into a web shop.
 
 It registered an account. It logged in. It searched for juice, filled a basket, opened the profile page. Then it came back with a list: seven things to fix, ordered by how much they matter, each with a one-line reason.
 
-I had a coffee in that time. Not a good one. It was still cooling.
+I had a coffee in that time. Not a good one. It was still too hot to drink, which is more patience than I've ever shown a scanner.
 
 I come from application security, so I don't say this lightly: **the hardest part of security used to be getting started. That part is mostly gone.**
 
@@ -16,7 +16,7 @@ I come from application security, so I don't say this lightly: **the hardest par
 
 In 2018 I wrote [Want to Write Good Code? Start Using Security Tests](../../archive/write-good-code-with-security-tests/), arguing that security checks belong in the pipeline. Two months later I pointed the tools at a deliberately broken shop in [Hacking Juice Shop, the DevSecOps Way](../../archive/hacking-juice-shop-the-devsecops-way/). In 2019 I was still [hand-wiring ZAP as a proxy](../../archive/debugging-ios-apps-with-zaproxy/) just to see my own traffic. And I spent an unreasonable number of words on [whether we even need threat modeling](../../archive/do-we-really-need-threat-modeling/), and then on [doing it as code](../../archive/threat-modeling-as-code/).
 
-Eight years ago, that was a weekend of YAML, Docker flags and patience. A weekend I would have spent outside, like a person.
+Eight years ago, that was a weekend of YAML, Docker flags and patience. A weekend I would otherwise have spent playing Civilization VII, so honestly, a loss for no one. (My CFO still says to wait for a sale.)
 
 Today it boils down to this: **one line to install, one paragraph to ask.**
 
@@ -28,7 +28,7 @@ This website is a folder of Markdown on GitHub Pages. Nothing to hack, you'd thi
 - **[Snyk](https://snyk.io)** is connected through its GitHub integration and watches dependencies and code.
 - **`main` is protected.** Everything goes through a pull request, and every GitHub Action is pinned to a commit SHA, so a compromised tag can't swap the code under me.
 
-Setup time: an afternoon, most of it reading docs. Running cost: zero attention, until something is actually wrong.
+Setup time: an afternoon, most of it spent reading docs and pretending I'd already read them. Running cost: zero attention, until something is actually wrong.
 
 That's the right shape for security: **silent when boring, loud when it matters.**
 
@@ -36,7 +36,7 @@ That's the right shape for security: **silent when boring, loud when it matters.
 
 Scanning code is the easy half. The half I never did was testing a *running* app, because it needs someone to use it like a user would: register, log in, search, fill a basket. That's how a scanner sees real traffic.
 
-It's also the most tedious job in security. Which makes it a perfect job for an agent.
+It's also the most tedious job in security. For years my plan was "I'll do it next quarter." I have been saying next quarter since 2018. Which makes it a perfect job for an agent: it doesn't procrastinate, and it doesn't need a snack.
 
 So I built [**zap-mcp**](https://github.com/omerlh/zap-mcp), a small [MCP](https://modelcontextprotocol.io) server with three tools:
 
@@ -80,7 +80,7 @@ Three things I like about it:
 
 - **It rates in context.** ZAP rates the *type* of issue. The skill asks what it means *in this app*.
 - **It says what it didn't test.** Passive scanning sees only the pages it visited, and the report says so up front.
-- **It never calls a guess a fact.** "Needs verification" is a respectable answer. I know people who've never said it.
+- **It never calls a guess a fact.** "Needs verification" is a respectable answer. I know people who've never said it. I am, on a bad day, one of them.
 
 Same Juice Shop run, but now the output is something I could hand to a developer without a meeting.
 
@@ -98,7 +98,7 @@ There are limits, and they matter. Passive scanning finds hygiene problems, not 
 
 If you've been putting this off like I was, here's the smallest useful version:
 
-1. **Add a secret scanner to CI.** Today. It takes less time than this post.
+1. **Add a secret scanner to CI.** Today. It takes less time than reading this post, and I'm not even sorry about the length.
 2. **Protect `main` and pin your Actions.** Make the safe path the only path.
 3. **Run the ZAP MCP against Juice Shop first.** Then against something that's yours.
 
