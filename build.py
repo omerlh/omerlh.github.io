@@ -6,7 +6,7 @@
   archive/<slug>/index.html are re-wrapped in the current layout (content untouched)
   index.html, posts/index.html, archive/index.html, sitemap.xml, robots.txt are generated
 """
-import re, html, glob, os, datetime
+import re, html, glob, os, datetime, json
 
 BASE = 'https://omerlh.github.io'
 NAME = 'Omer Levi Hevroni'
@@ -65,7 +65,7 @@ def blocks(lines):
         out.append('<p>' + inline(' '.join(p)) + '</p>')
     return '\n'.join(out)
 
-def layout(title, desc, body, path, active='', wide=False, kind='website'):
+def layout(title, desc, body, path, active='', wide=False, kind='website', ld=None):
     """path is the page's URL path relative to the site root, e.g. 'posts/x/'."""
     up = '../' * path.strip('/').count('/') + ('../' if path.strip('/') else '') if False else '../' * (len([p for p in path.split('/') if p]))
     root = up or './'
@@ -73,12 +73,13 @@ def layout(title, desc, body, path, active='', wide=False, kind='website'):
     url = f'{BASE}/{path}'.rstrip('/') + ('/' if path else '')
     e = html.escape
     analytics = (f'<script data-goatcounter="https://{GOATCOUNTER}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>' if GOATCOUNTER else '')
+    ldjson = ('<script type="application/ld+json">' + json.dumps(ld).replace('</', '<\\/') + '</script>') if ld else ''
     return f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(title)}</title><meta name="description" content="{e(desc)}">
 <link rel="canonical" href="{url}"><link rel="icon" href="{FAVICON}"><link rel="stylesheet" href="{up}style.css">
 <meta property="og:title" content="{e(title)}"><meta property="og:description" content="{e(desc)}"><meta property="og:type" content="{kind}"><meta property="og:url" content="{url}">
-<meta name="color-scheme" content="light">{analytics}</head><body>
+<meta name="color-scheme" content="light">{analytics}{ldjson}</head><body>
 <header class="site"><div class="wrap{" wide" if wide else ""}"><a class="brand" href="{root}">Omer <span>Levi</span> Hevroni</a><nav>{nav}</nav></div></header>
 <main>{body}</main>
 <footer><div class="wrap"><span>© {datetime.date.today().year} {NAME}</span><span><a href="https://medium.com/@omerlh">Medium</a> · <a href="https://github.com/omerlh">GitHub</a> · <a href="https://www.linkedin.com/in/omerlh">LinkedIn</a> · <a href="https://x.com/omerlh">X</a></span></div></footer>
@@ -104,7 +105,11 @@ for f in sorted(glob.glob('posts/*.md'), reverse=True):
     nice = datetime.date.fromisoformat(date).strftime('%B %-d, %Y')
     mins = max(1, round(words(body) / 220))
     art = f'<div class="wrap"><article><h1>{html.escape(title)}</h1><p class="deck">{html.escape(sub)}</p><p class="meta">{nice} · {mins} min read · <a href="https://medium.com/@omerlh">Also on Medium</a></p>{body}</article></div>'
-    write(f'posts/{slug}/index.html', layout(meta_title, meta_desc, art, f'posts/{slug}/', 'posts/', kind='article'))
+    ld = {'@context': 'https://schema.org', '@type': 'Article', 'headline': title, 'description': meta_desc, 'datePublished': date,
+          'mainEntityOfPage': f'{BASE}/posts/{slug}/',
+          'author': {'@type': 'Person', 'name': NAME, 'url': f'{BASE}/about/',
+                     'sameAs': ['https://github.com/omerlh', 'https://www.linkedin.com/in/omerlh', 'https://medium.com/@omerlh']}}
+    write(f'posts/{slug}/index.html', layout(meta_title, meta_desc, art, f'posts/{slug}/', 'posts/', kind='article', ld=ld))
     posts.append(dict(date=date, slug=slug, title=title, sub=sub, mins=mins, nice=nice))
 
 def card(p, up=''):

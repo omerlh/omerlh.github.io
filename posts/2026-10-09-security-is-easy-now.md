@@ -132,7 +132,7 @@ If you've been putting this off like I was, here's the smallest useful version:
 2. **Protect `main` and pin your Actions.** Make the safe path the only path.
 3. **Run the ZAP MCP against Juice Shop first.** Then against something that's yours.
 
-Security used to feel like a project. It now feels like a habit you can start before lunch.
+Security used to feel like a project. It now feels like a habit you can start before lunch. (Same trick works at home, by the way: I [ran my household's month-end close](../close-at-home/) the same way, with fewer exploits and more video games.)
 
 *Next: I let the agent try to fix a whole app and report back. I'm told this is how it starts.*
 
