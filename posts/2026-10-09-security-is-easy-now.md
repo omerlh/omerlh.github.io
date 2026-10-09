@@ -88,7 +88,7 @@ Every alert is a hypothesis. Before anything reaches the report, the agent tries
 
 The proofs are minimal and read-only, on apps you own or are allowed to test. This isn't an attacker; it's the colleague who checks before filing the ticket.
 
-Same Juice Shop run: 63 alerts in, a short report out, and every line in it is something you can reproduce. **I can worry less, because the list is short and true.**
+The goal: 63 alerts in, a short report out, and every line in it something you can reproduce. **I can worry less, because the list is short and true.**
 
 ## What actually changed
 
