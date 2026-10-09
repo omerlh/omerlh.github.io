@@ -108,7 +108,7 @@ It never pushes until I say so, and it only touches a local or test app. It's no
 
 The pull request is the part I like. It doesn't say "your CORS is bad." It says "here was the request, here was the response, here is the change, here is the same request after." A reviewer can read that over coffee.
 
-I'll be honest: I wrote this loop and the prompts, but I haven't watched it fix a whole app end to end yet. That's the next experiment.
+I'm not claiming a victory lap. At [Ledge](https://ledge.co) we have a nightly ZAP run set up as a Cursor automation, so the scan-and-prove half now happens while everyone sleeps, and the fixes are the experiment we're starting now. I'll write up what it gets right and what it gets embarrassingly wrong.
 
 ## What actually changed
 
