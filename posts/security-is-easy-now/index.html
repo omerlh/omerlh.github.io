@@ -5,7 +5,7 @@
 <meta property="og:title" content="I Hired an AI to Hack a Shop While I Made Coffee. Security Got Easy When I Wasn&#x27;t Looking."><meta property="og:description" content="In 2018 it took me a weekend of YAML. Now it&#x27;s one line and one paragraph."><meta property="og:type" content="website"><meta property="og:url" content="https://omerlh.github.io/posts/security-is-easy-now/">
 <meta name="color-scheme" content="light"><script data-goatcounter="https://omerlh.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script></head><body>
 <header class="site"><div class="wrap"><a class="brand" href="../../">Omer <span>Levi</span> Hevroni</a><nav><a href="../../posts/" aria-current=page>Writing</a><a href="../../talks/">Talks</a><a href="../../about/">About</a><a href="../../archive/">Archive</a></nav></div></header>
-<main><div class="wrap"><article><h1>I Hired an AI to Hack a Shop While I Made Coffee. Security Got Easy When I Wasn&#x27;t Looking.</h1><p class="deck">In 2018 it took me a weekend of YAML. Now it&#x27;s one line and one paragraph.</p><p class="meta">October 9, 2026 · 6 min read · <a href="https://medium.com/@omerlh">Also on Medium</a></p><hr>
+<main><div class="wrap"><article><h1>I Hired an AI to Hack a Shop While I Made Coffee. Security Got Easy When I Wasn&#x27;t Looking.</h1><p class="deck">In 2018 it took me a weekend of YAML. Now it&#x27;s one line and one paragraph.</p><p class="meta">October 9, 2026 · 7 min read · <a href="https://medium.com/@omerlh">Also on Medium</a></p><hr>
 <p>I asked my new employee to break into a web shop.</p>
 <p>It registered an account. It logged in. It searched for juice, filled a basket, opened the profile page. Then it came back with a list: seven things to fix, ordered by how much they matter, each with a one-line reason.</p>
 <p>I had a coffee in that time. Not a good one. It was still too hot to drink, which is more patience than I've ever shown a scanner.</p>
@@ -42,6 +42,14 @@
 <ul><li><strong>No proof, no finding.</strong> What it can't reproduce goes in a one-line "dismissed" list, not in my face.</li><li><strong>Proof comes attached.</strong> The request and the response, so a developer can see it in ten seconds without a meeting.</li><li><strong>It admits what it couldn't verify.</strong> "Unproven" is a respectable answer. I know people who've never said it. I am, on a bad day, one of them.</li></ul>
 <p>The proofs are minimal and read-only, on apps you own or are allowed to test. This isn't an attacker; it's the colleague who checks before filing the ticket.</p>
 <p>The goal: 63 alerts in, a short report out, and every line in it something you can reproduce. <strong>I can worry less, because the list is short and true.</strong></p>
+<h2>Don't be the madman with the list</h2>
+<p>Security has an image problem. It's the person who shows up at the end, points at your code, and leaves a PDF.</p>
+<p>In <em><a href="https://itrevolution.com/product/the-unicorn-project/">The Unicorn Project</a></em>, the heroes win by making the right thing part of the daily flow, not a gate at the end of it. Security should work the same way. Nobody enjoys the outside madman pointing at issues. Everybody enjoys the teammate who sends a fix.</p>
+<p>So the second prompt in the repo is for a <strong>coding agent that lives in your repo</strong>. Same idea as a bug-bot that fixes what it finds, but for a running app. Paste it in, and the loop goes:</p>
+<ol><li>Run the app and scan it through ZAP.</li><li>Prove each finding. PoC or GTFO.</li><li>Fix it on a branch, with a regression test.</li><li>Replay the proof to check the fix actually works. If the exploit still works, it isn't fixed.</li><li>Re-scan, then prepare a pull request with the before and after proof.</li></ol>
+<p>It never pushes until I say so, and it only touches a local or test app. It's not allowed to "fix" a finding by switching off the alert. (I've met humans who consider that a valid strategy.)</p>
+<p>The pull request is the part I like. It doesn't say "your CORS is bad." It says "here was the request, here was the response, here is the change, here is the same request after." A reviewer can read that over coffee.</p>
+<p>I'll be honest: I wrote this loop and the prompts, but I haven't watched it fix a whole app end to end yet. That's the next experiment.</p>
 <h2>What actually changed</h2>
 <p>Nothing here is new science. ZAP is old. Secret scanners are old. What changed:</p>
 <ol><li><strong>Setup collapsed.</strong> One line to install a tool, one afternoon to wire CI.</li><li><strong>The manual labour moved to an agent.</strong> It clicks, I read the verdict.</li><li><strong>The noise got a filter with a conscience.</strong> Security tools used to hand you a list and a guilt trip. Now they hand you the five things that are real.</li></ol>
@@ -50,7 +58,7 @@
 <p>If you've been putting this off like I was, here's the smallest useful version:</p>
 <ol><li><strong>Add a secret scanner to CI.</strong> Today. It takes less time than reading this post, and I'm not even sorry about the length.</li><li><strong>Protect <code>main</code> and pin your Actions.</strong> Make the safe path the only path.</li><li><strong>Run the ZAP MCP against Juice Shop first.</strong> Then against something that's yours.</li></ol>
 <p>Security used to feel like a project. It now feels like a habit you can start before lunch.</p>
-<p><em>Next: giving the same agent a harder job than clicking around. I'm told that's how it starts.</em></p>
+<p><em>Next: I let the agent fix a whole app and report back. I'm told this is how it starts.</em></p>
 <p><em>What's the security task you keep postponing? Tell me, and I'll tell you if an agent can take it.</em></p></article></div></main>
 <footer><div class="wrap"><span>© 2026 Omer Levi Hevroni</span><span><a href="https://medium.com/@omerlh">Medium</a> · <a href="https://github.com/omerlh">GitHub</a> · <a href="https://www.linkedin.com/in/omerlh">LinkedIn</a> · <a href="https://x.com/omerlh">X</a></span></div></footer>
 </body></html>

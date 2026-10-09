@@ -90,6 +90,26 @@ The proofs are minimal and read-only, on apps you own or are allowed to test. Th
 
 The goal: 63 alerts in, a short report out, and every line in it something you can reproduce. **I can worry less, because the list is short and true.**
 
+## Don't be the madman with the list
+
+Security has an image problem. It's the person who shows up at the end, points at your code, and leaves a PDF.
+
+In *[The Unicorn Project](https://itrevolution.com/product/the-unicorn-project/)*, the heroes win by making the right thing part of the daily flow, not a gate at the end of it. Security should work the same way. Nobody enjoys the outside madman pointing at issues. Everybody enjoys the teammate who sends a fix.
+
+So the second prompt in the repo is for a **coding agent that lives in your repo**. Same idea as a bug-bot that fixes what it finds, but for a running app. Paste it in, and the loop goes:
+
+1. Run the app and scan it through ZAP.
+2. Prove each finding. PoC or GTFO.
+3. Fix it on a branch, with a regression test.
+4. Replay the proof to check the fix actually works. If the exploit still works, it isn't fixed.
+5. Re-scan, then prepare a pull request with the before and after proof.
+
+It never pushes until I say so, and it only touches a local or test app. It's not allowed to "fix" a finding by switching off the alert. (I've met humans who consider that a valid strategy.)
+
+The pull request is the part I like. It doesn't say "your CORS is bad." It says "here was the request, here was the response, here is the change, here is the same request after." A reviewer can read that over coffee.
+
+I'll be honest: I wrote this loop and the prompts, but I haven't watched it fix a whole app end to end yet. That's the next experiment.
+
 ## What actually changed
 
 Nothing here is new science. ZAP is old. Secret scanners are old. What changed:
@@ -110,6 +130,6 @@ If you've been putting this off like I was, here's the smallest useful version:
 
 Security used to feel like a project. It now feels like a habit you can start before lunch.
 
-*Next: giving the same agent a harder job than clicking around. I'm told that's how it starts.*
+*Next: I let the agent fix a whole app and report back. I'm told this is how it starts.*
 
 *What's the security task you keep postponing? Tell me, and I'll tell you if an agent can take it.*
