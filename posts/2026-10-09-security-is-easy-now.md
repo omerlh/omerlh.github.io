@@ -14,7 +14,7 @@ I had a coffee in that time. Not a good one. It was still too hot to drink, whic
 
 I come from application security, so I don't say this lightly: **the hardest part of security used to be getting started. That part is mostly gone.**
 
-The short version: I connected an AI agent to [OWASP ZAP](https://www.zaproxy.org) through a small MCP server, had it browse OWASP Juice Shop like a user, and 63 raw alerts became 7 findings. Installing it is one command.
+Short version: an AI agent, ZAP and a small MCP server turned 63 raw alerts on Juice Shop into 7 findings. Installing it is one command.
 
 ## From a weekend of YAML in 2018 to one line today
 
@@ -82,17 +82,17 @@ Hundreds of alerts. Half of them noise, a quarter "informational," and the one t
 
 **The problem was never finding things. It was drowning in the list.**
 
-This is where AI is genuinely good now. It doesn't get bored on alert 40. So the repo ships a **triage skill**, and it plays by the oldest rule in the trade: **PoC or GTFO.**
+This is where an AI should help: it doesn't get bored on alert 40. So the repo ships a **triage skill**, written to follow the oldest rule in the trade: **PoC or GTFO.**
 
-Every alert is a hypothesis. Before anything reaches the report, the agent tries to prove it: replays the request, looks at the real response, and keeps only what it can demonstrate. Then it rates what survived with the [OWASP Risk Rating Methodology](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology): how likely, how bad, so what do I fix first?
+Every alert is a hypothesis. The skill tells the agent to try to prove it before it reaches the report: replays the request, looks at the real response, and keeps only what it can demonstrate. Then it rates what survived with the [OWASP Risk Rating Methodology](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology): how likely, how bad, so what do I fix first?
 
 - **No proof, no finding.** What it can't reproduce goes in a one-line "dismissed" list, not in my face.
 - **Proof comes attached.** The request and the response, so a developer can see it in ten seconds without a meeting.
 - **It admits what it couldn't verify.** "Unproven" is a respectable answer. I know people who've never said it. I am, on a bad day, one of them.
 
-The proofs are minimal and read-only, on apps you own or are allowed to test. This isn't an attacker; it's the colleague who checks before filing the ticket.
+The proofs are minimal and read-only, on apps you own or are allowed to test. Think of the colleague who checks before filing the ticket.
 
-The goal: 63 alerts in, a short report out, and every line in it something you can reproduce. **I'd worry less, because the list would be short and true.**
+The goal: 63 alerts in, a short report out, and every line in it something you can reproduce. **If it works, the list is short and true, and I worry less.**
 
 ## Let the agent fix it: scan, prove, patch, verify
 
@@ -100,7 +100,7 @@ Security has an image problem. It's the person who shows up at the end, points a
 
 In *[The Unicorn Project](https://itrevolution.com/product/the-unicorn-project/)*, the heroes win by making the right thing part of the daily flow, not a gate at the end of it. Security should work the same way. Nobody enjoys the outside madman pointing at issues. Everybody enjoys the teammate who sends a fix.
 
-So the second prompt in the repo is for a **coding agent that lives in your repo**. Same idea as a bug-bot that fixes what it finds, but for a running app. Paste it in, and the loop goes:
+So the second prompt in the repo is for a **coding agent that lives in your repo**. Same idea as a bug-bot that fixes what it finds, but for a running app. Paste it in, and the loop it is designed to run goes:
 
 1. Run the app and scan it through ZAP.
 2. Prove each finding. PoC or GTFO.
@@ -108,7 +108,7 @@ So the second prompt in the repo is for a **coding agent that lives in your repo
 4. Replay the proof to check the fix actually works. If the exploit still works, it isn't fixed.
 5. Re-scan, then prepare a pull request with the before and after proof.
 
-It never pushes until I say so, and it only touches a local or test app. It's not allowed to "fix" a finding by switching off the alert. (I've met humans who consider that a valid strategy.)
+The prompt says it never pushes until I say so, only touches a local or test app, and is not allowed to "fix" a finding by switching off the alert. (I've met humans who consider that a valid strategy.)
 
 The pull request is the part I'm aiming for. It shouldn't say "your CORS is bad." It says "here was the request, here was the response, here is the change, here is the same request after." A reviewer can read that over coffee.
 
@@ -132,7 +132,7 @@ If you've been putting this off like I was, here's the smallest useful version:
 2. **Protect `main` and pin your Actions.** Make the safe path the only path.
 3. **Run the ZAP MCP against Juice Shop first.** Then against something that's yours.
 
-Security used to feel like a project. It now feels like a habit you can start before lunch. (Same trick works at home, by the way: I [ran my household's month-end close](../close-at-home/) the same way, with fewer exploits and more video games.)
+Security used to feel like a project. Now you can start before lunch. (Same trick works at home, by the way: I [ran my household's month-end close](../close-at-home/) the same way, with fewer exploits and more video games.)
 
 *Next: I let the agent try to fix a whole app and report back. I'm told this is how it starts.*
 
