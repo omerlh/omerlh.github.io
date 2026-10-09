@@ -70,29 +70,35 @@ The server groups alerts by type, so the 63 became **7 findings**:
 
 Seven things is a to-do list. Sixty-three is a wall. **The grouping did more for me than any clever scanning trick.**
 
-## Finding things is half the job
+## The real pain: the pile
 
-A list of findings isn't a report. It's homework you assign yourself.
+Ask anyone who has run a security tool what they hate most. It's not the setup. It's the output.
 
-So the repo also ships a **triage skill**. For each finding it decides: real, noise, or *needs a human to check*. Then it rates the real ones with the [OWASP Risk Rating Methodology](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology): how likely is it, how bad would it be, so what do I fix first? And it writes a short report with the evidence and a concrete fix for each item.
+Hundreds of alerts. Half of them noise, a quarter "informational," and the one that matters sits on page nine. So the report gets filed under "later," which is where security reports go to retire.
 
-Three things I like about it:
+**The problem was never finding things. It was drowning in the list.**
 
-- **It rates in context.** ZAP rates the *type* of issue. The skill asks what it means *in this app*.
-- **It says what it didn't test.** Passive scanning sees only the pages it visited, and the report says so up front.
-- **It never calls a guess a fact.** "Needs verification" is a respectable answer. I know people who've never said it. I am, on a bad day, one of them.
+This is where AI is genuinely good now. It doesn't get bored on alert 40. So the repo ships a **triage skill**, and it plays by the oldest rule in the trade: **PoC or GTFO.**
 
-Same Juice Shop run, but now the output is something I could hand to a developer without a meeting.
+Every alert is a hypothesis. Before anything reaches the report, the agent tries to prove it: replays the request, looks at the real response, and keeps only what it can demonstrate. Then it rates what survived with the [OWASP Risk Rating Methodology](https://owasp.org/www-community/OWASP_Risk_Rating_Methodology): how likely, how bad, so what do I fix first?
+
+- **No proof, no finding.** What it can't reproduce goes in a one-line "dismissed" list, not in my face.
+- **Proof comes attached.** The request and the response, so a developer can see it in ten seconds without a meeting.
+- **It admits what it couldn't verify.** "Unproven" is a respectable answer. I know people who've never said it. I am, on a bad day, one of them.
+
+The proofs are minimal and read-only, on apps you own or are allowed to test. This isn't an attacker; it's the colleague who checks before filing the ticket.
+
+Same Juice Shop run: 63 alerts in, a short report out, and every line in it is something you can reproduce. **I can worry less, because the list is short and true.**
 
 ## What actually changed
 
-Nothing here is new science. ZAP is old. Secret scanners are old. What changed is the cost of the boring bit:
+Nothing here is new science. ZAP is old. Secret scanners are old. What changed:
 
 1. **Setup collapsed.** One line to install a tool, one afternoon to wire CI.
 2. **The manual labour moved to an agent.** It clicks, I read the verdict.
-3. **The output got shaped for decisions.** A report nobody reads protects nothing.
+3. **The noise got a filter with a conscience.** Security tools used to hand you a list and a guilt trip. Now they hand you the five things that are real.
 
-There are limits, and they matter. Passive scanning finds hygiene problems, not deep logic bugs. It's a smoke detector, not a penetration test, and it belongs only on apps you're allowed to test. But a smoke detector in every house beats a fire inspector who visits once a year.
+Limits, because there are always limits: passive browsing only finds what it visits, and proving a finding is not a full penetration test. It's a smoke detector that checks the fire before it screams. Still better than a fire inspector who visits once a year.
 
 ## Steal this
 

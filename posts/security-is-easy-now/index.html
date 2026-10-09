@@ -5,7 +5,7 @@
 <meta property="og:title" content="I Hired an AI to Hack a Shop While I Made Coffee. Security Got Easy When I Wasn&#x27;t Looking."><meta property="og:description" content="In 2018 it took me a weekend of YAML. Now it&#x27;s one line and one paragraph."><meta property="og:type" content="website"><meta property="og:url" content="https://omerlh.github.io/posts/security-is-easy-now/">
 <meta name="color-scheme" content="light"><script data-goatcounter="https://omerlh.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script></head><body>
 <header class="site"><div class="wrap"><a class="brand" href="../../">Omer <span>Levi</span> Hevroni</a><nav><a href="../../posts/" aria-current=page>Writing</a><a href="../../talks/">Talks</a><a href="../../about/">About</a><a href="../../archive/">Archive</a></nav></div></header>
-<main><div class="wrap"><article><h1>I Hired an AI to Hack a Shop While I Made Coffee. Security Got Easy When I Wasn&#x27;t Looking.</h1><p class="deck">In 2018 it took me a weekend of YAML. Now it&#x27;s one line and one paragraph.</p><p class="meta">October 9, 2026 · 5 min read · <a href="https://medium.com/@omerlh">Also on Medium</a></p><hr>
+<main><div class="wrap"><article><h1>I Hired an AI to Hack a Shop While I Made Coffee. Security Got Easy When I Wasn&#x27;t Looking.</h1><p class="deck">In 2018 it took me a weekend of YAML. Now it&#x27;s one line and one paragraph.</p><p class="meta">October 9, 2026 · 6 min read · <a href="https://medium.com/@omerlh">Also on Medium</a></p><hr>
 <p>I asked my new employee to break into a web shop.</p>
 <p>It registered an account. It logged in. It searched for juice, filled a basket, opened the profile page. Then it came back with a list: seven things to fix, ordered by how much they matter, each with a one-line reason.</p>
 <p>I had a coffee in that time. Not a good one. It was still too hot to drink, which is more patience than I've ever shown a scanner.</p>
@@ -33,16 +33,19 @@
 <p>The server groups alerts by type, so the 63 became <strong>7 findings</strong>:</p>
 <ul><li>Permissive CORS (<code>Access-Control-Allow-Origin: *</code>) across 27 URLs</li><li>No Content Security Policy</li><li>A session ID travelling in the URL</li><li>A private IP address leaking from an admin endpoint</li><li>A few missing headers and timestamp disclosures</li></ul>
 <p>Seven things is a to-do list. Sixty-three is a wall. <strong>The grouping did more for me than any clever scanning trick.</strong></p>
-<h2>Finding things is half the job</h2>
-<p>A list of findings isn't a report. It's homework you assign yourself.</p>
-<p>So the repo also ships a <strong>triage skill</strong>. For each finding it decides: real, noise, or <em>needs a human to check</em>. Then it rates the real ones with the <a href="https://owasp.org/www-community/OWASP_Risk_Rating_Methodology">OWASP Risk Rating Methodology</a>: how likely is it, how bad would it be, so what do I fix first? And it writes a short report with the evidence and a concrete fix for each item.</p>
-<p>Three things I like about it:</p>
-<ul><li><strong>It rates in context.</strong> ZAP rates the <em>type</em> of issue. The skill asks what it means <em>in this app</em>.</li><li><strong>It says what it didn't test.</strong> Passive scanning sees only the pages it visited, and the report says so up front.</li><li><strong>It never calls a guess a fact.</strong> "Needs verification" is a respectable answer. I know people who've never said it. I am, on a bad day, one of them.</li></ul>
-<p>Same Juice Shop run, but now the output is something I could hand to a developer without a meeting.</p>
+<h2>The real pain: the pile</h2>
+<p>Ask anyone who has run a security tool what they hate most. It's not the setup. It's the output.</p>
+<p>Hundreds of alerts. Half of them noise, a quarter "informational," and the one that matters sits on page nine. So the report gets filed under "later," which is where security reports go to retire.</p>
+<p><strong>The problem was never finding things. It was drowning in the list.</strong></p>
+<p>This is where AI is genuinely good now. It doesn't get bored on alert 40. So the repo ships a <strong>triage skill</strong>, and it plays by the oldest rule in the trade: <strong>PoC or GTFO.</strong></p>
+<p>Every alert is a hypothesis. Before anything reaches the report, the agent tries to prove it: replays the request, looks at the real response, and keeps only what it can demonstrate. Then it rates what survived with the <a href="https://owasp.org/www-community/OWASP_Risk_Rating_Methodology">OWASP Risk Rating Methodology</a>: how likely, how bad, so what do I fix first?</p>
+<ul><li><strong>No proof, no finding.</strong> What it can't reproduce goes in a one-line "dismissed" list, not in my face.</li><li><strong>Proof comes attached.</strong> The request and the response, so a developer can see it in ten seconds without a meeting.</li><li><strong>It admits what it couldn't verify.</strong> "Unproven" is a respectable answer. I know people who've never said it. I am, on a bad day, one of them.</li></ul>
+<p>The proofs are minimal and read-only, on apps you own or are allowed to test. This isn't an attacker; it's the colleague who checks before filing the ticket.</p>
+<p>Same Juice Shop run: 63 alerts in, a short report out, and every line in it is something you can reproduce. <strong>I can worry less, because the list is short and true.</strong></p>
 <h2>What actually changed</h2>
-<p>Nothing here is new science. ZAP is old. Secret scanners are old. What changed is the cost of the boring bit:</p>
-<ol><li><strong>Setup collapsed.</strong> One line to install a tool, one afternoon to wire CI.</li><li><strong>The manual labour moved to an agent.</strong> It clicks, I read the verdict.</li><li><strong>The output got shaped for decisions.</strong> A report nobody reads protects nothing.</li></ol>
-<p>There are limits, and they matter. Passive scanning finds hygiene problems, not deep logic bugs. It's a smoke detector, not a penetration test, and it belongs only on apps you're allowed to test. But a smoke detector in every house beats a fire inspector who visits once a year.</p>
+<p>Nothing here is new science. ZAP is old. Secret scanners are old. What changed:</p>
+<ol><li><strong>Setup collapsed.</strong> One line to install a tool, one afternoon to wire CI.</li><li><strong>The manual labour moved to an agent.</strong> It clicks, I read the verdict.</li><li><strong>The noise got a filter with a conscience.</strong> Security tools used to hand you a list and a guilt trip. Now they hand you the five things that are real.</li></ol>
+<p>Limits, because there are always limits: passive browsing only finds what it visits, and proving a finding is not a full penetration test. It's a smoke detector that checks the fire before it screams. Still better than a fire inspector who visits once a year.</p>
 <h2>Steal this</h2>
 <p>If you've been putting this off like I was, here's the smallest useful version:</p>
 <ol><li><strong>Add a secret scanner to CI.</strong> Today. It takes less time than reading this post, and I'm not even sorry about the length.</li><li><strong>Protect <code>main</code> and pin your Actions.</strong> Make the safe path the only path.</li><li><strong>Run the ZAP MCP against Juice Shop first.</strong> Then against something that's yours.</li></ol>
