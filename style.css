@@ -83,3 +83,6 @@ footer a{color:var(--muted)}
 footer .wrap{display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between}
 @media (max-width:560px){body{font-size:18px}.hero{padding:48px 0 24px}.site .wrap{height:auto;padding-top:14px;padding-bottom:10px;flex-wrap:wrap}.plain li{flex-direction:column;gap:2px}}
 @media print{.site,footer{display:none}body{background:#fff;color:#000}}
+table{width:100%;border-collapse:collapse;margin:1.2em 0;font-size:.95em;display:block;overflow-x:auto}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line)}
+th{font-weight:600}
