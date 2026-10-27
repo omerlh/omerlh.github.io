@@ -36,6 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0          # page lastmod is the source file's commit date
           persist-credentials: false
       - run: python3 build.py
       - name: Fail if the committed output is stale
