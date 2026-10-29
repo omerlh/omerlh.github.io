@@ -1,6 +1,6 @@
 # Personal website
 
-Static site for Omer Levi Hevroni, hosted on GitHub Pages. No frameworks, no JavaScript, no external requests.
+Static site for Omer Levi Hevroni, hosted on GitHub Pages. No frameworks. No JavaScript or external requests, with one exception: the cookie-free GoatCounter analytics script (see `GOATCOUNTER` in `build.py`).
 
 ## Layout
 - `posts/YYYY-MM-DD-slug.md`: new posts. First line `# Title`, second `*Subtitle: ...*`. Plain Markdown (headings, lists, quotes, links, bold, italics).
@@ -11,7 +11,7 @@ Static site for Omer Levi Hevroni, hosted on GitHub Pages. No frameworks, no Jav
 
 ## Rules
 - NEVER reference `omerlh.info`. The old domain lapsed in 2025 and belongs to someone else (redirects to a gambling site). Do not link to it, hotlink from it, or add it as a custom domain.
-- Keep it dependency-free and self-contained (no CDN scripts, fonts, trackers).
+- Keep it dependency-free and self-contained (no CDN scripts or fonts, no trackers other than GoatCounter).
 - Posts must not contain infrastructure details (hostnames, ports, tool configs, credentials) or personal financial figures.
 - CI (`.github/workflows/security.yml`) runs gitleaks and a build check. Snyk is connected via its GitHub integration, not CI. Never add secrets to the repo. `main` is protected: always work on a branch and open a PR. Keep every Action pinned to a commit SHA.
 - Enable the local hook once per clone: `git config core.hooksPath .githooks`. Run `python3 build.py` before committing.
