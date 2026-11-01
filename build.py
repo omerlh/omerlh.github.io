@@ -3,6 +3,7 @@
 
   posts/YYYY-MM-DD-slug.md -> posts/<slug>/index.html   (first line '# Title', then '*Subtitle: ...*')
   Optional post lines, same shape as Subtitle: *Title:*, *Description:*, *Image:* (share-image URL or site path; default /og.png)
+  A heading may end with {#anchor} to set a stable id. A list of "- [ ]" / "- [x]" items renders as checkboxes.
   pages/*.md               -> <name>/index.html
   archive/<slug>/index.html are re-wrapped in the current layout (content untouched).
   An archive page can set data-image="..." (kept, like data-date) to override its share image.
@@ -115,6 +116,41 @@ def inline(t):
     t = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<em>\1</em>', t)
     return t
 
+def heading_html(level, text):
+    """Optional trailing {#anchor} becomes a stable id. The id is not shown."""
+    m = re.search(r'\s+\{#([A-Za-z][\w-]*)\}\s*$', text)
+    anchor = ''
+    if m:
+        text = text[:m.start()]
+        anchor = f' id="{m.group(1)}"'
+    return f'<h{level}{anchor}>{inline(text)}</h{level}>'
+
+def list_html(lines, i):
+    """Render a markdown list. Task items become a checkbox list; other lists stay plain.
+    A link like "- [X](https://...)" is not a task: a task needs a space after the brackets."""
+    ordered = bool(re.match(r'\s*\d+\.', lines[i]))
+    items = []
+    while i < len(lines) and re.match(r'\s*([-*]|\d+\.) ', lines[i]):
+        items.append(re.sub(r'^\s*([-*]|\d+\.) ', '', lines[i]))
+        i += 1
+    tasks = []
+    for raw in items:
+        tm = re.fullmatch(r'\[([ xX])\] (.*)', raw)
+        if not tm:
+            tasks = None
+            break
+        tasks.append((tm.group(1).lower() == 'x', tm.group(2)))
+    if tasks is not None and not ordered:
+        lis = []
+        for checked, text in tasks:
+            mark = ' checked' if checked else ''
+            # One span so bold inside the item stays in the text column. Separate
+            # grid children would drop the rest of the line into the checkbox column.
+            lis.append(f'<li><label><input type="checkbox" disabled{mark}><span>{inline(text)}</span></label></li>')
+        return '<ul class="checks">' + ''.join(lis) + '</ul>', i
+    tag = 'ol' if ordered else 'ul'
+    return f'<{tag}>' + ''.join(f'<li>{inline(x)}</li>' for x in items) + f'</{tag}>', i
+
 def blocks(lines):
     out, i = [], 0
     while i < len(lines):
@@ -127,7 +163,7 @@ def blocks(lines):
             out.append('<blockquote>' + blocks(q) + '</blockquote>'); continue
         m = re.match(r'(#{1,3}) (.*)', l)
         if m:
-            n = len(m.group(1)); out.append(f'<h{n}>{inline(m.group(2))}</h{n}>'); i += 1; continue
+            out.append(heading_html(len(m.group(1)), m.group(2))); i += 1; continue
         if l.strip() == '---': out.append('<hr>'); i += 1; continue
         if l.startswith('```'):
             code = []; i += 1
@@ -144,11 +180,8 @@ def blocks(lines):
             out.append('<table><thead><tr>' + ''.join(f'<th>{inline(c)}</th>' for c in head) + '</tr></thead><tbody>'
                        + ''.join('<tr>' + ''.join(f'<td>{inline(c)}</td>' for c in r) + '</tr>' for r in body_rows) + '</tbody></table>'); continue
         if re.match(r'\s*([-*]|\d+\.) ', l):
-            tag = 'ol' if re.match(r'\s*\d+\.', l) else 'ul'
-            items = []
-            while i < len(lines) and re.match(r'\s*([-*]|\d+\.) ', lines[i]):
-                items.append(re.sub(r'^\s*([-*]|\d+\.) ', '', lines[i])); i += 1
-            out.append(f'<{tag}>' + ''.join(f'<li>{inline(x)}</li>' for x in items) + f'</{tag}>'); continue
+            html_list, i = list_html(lines, i)
+            out.append(html_list); continue
         p = []
         while i < len(lines) and lines[i].strip() and not re.match(r'(#{1,3} |>|---|```|\||\s*([-*]|\d+\.) )', lines[i]):
             p.append(lines[i]); i += 1
